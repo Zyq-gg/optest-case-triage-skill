@@ -25,7 +25,8 @@ optest-case-triage/
 ├── agents/
 │   └── openai.yaml
 ├── references/
-│   └── commit_workflow.md
+│   ├── commit_workflow.md
+│   └── official_pytorch_skills.md
 └── scripts/
     └── find_case_in_xlsx.py
 ```
@@ -75,6 +76,25 @@ cp -a optest-case-triage-skill/optest-case-triage \
 例如本地开发分支为 `2.9.1-dev-xxx` 时，通常以
 `upstream/2.9.1-dev` 为目标基线；官方版本覆盖则对应
 `official/release/2.9`。
+
+## PyTorch 官方 Skills 融合
+
+本仓库分析并路由了 PyTorch 官方 `.claude/skills` 中的全部 16 个 skill。
+直接融合的重点是 PT2 编译问题诊断、repro 最小化、AOTI、distributed、CUDA
+大索引和提交前审查；ATen dispatch、uint、MPS、文档、类型检查和 CI metrics
+等专门能力保留为条件链接。
+
+完整评估和路由见
+[`official_pytorch_skills.md`](optest-case-triage/references/official_pytorch_skills.md)。
+其中同时保存：
+
+- 指向官方 `main` 的实时链接，用于获取最新规则；
+- 指向分析基准 commit 的固定链接，用于复现当时采用的规则；
+- 通过工作 PyTorch 仓库 `official/main` 直接读取 skill 的命令。
+
+这里没有把 `pytorch/pytorch` 加成 Git submodule。Git submodule 不能只指向
+`.claude/skills` 子目录，递归克隆会带入完整 PyTorch 仓库。使用 remote ref
+和双链接能保持仓库轻量，也更容易随官方更新。
 
 ## 使用
 

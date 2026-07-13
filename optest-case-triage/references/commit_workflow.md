@@ -3,6 +3,16 @@
 Read this reference only when the user explicitly asks to commit validated
 optest fixes, prepare a branch for review, or push to the fork.
 
+## Contents
+
+- [Authorization Boundaries](#authorization-boundaries)
+- [Preflight](#preflight)
+- [Split Commits By Logical Fix](#split-commits-by-logical-fix)
+- [Stage Deliberately](#stage-deliberately)
+- [Validate Before Committing](#validate-before-committing)
+- [Commit Metadata](#commit-metadata)
+- [Push And Handoff](#push-and-handoff)
+
 ## Authorization Boundaries
 
 - A request to analyze, modify, or validate does not authorize a commit.
@@ -107,12 +117,20 @@ shared logic changed. If the full test cannot run, record the exact blocker and
 distinguish completed static checks from unrun tests. Do not claim a commit is
 verified when its required test did not run.
 
+For non-trivial changes, read `official_pytorch_skills.md` from this directory
+and apply the routed official `pr-review` checks that match the patch. At
+minimum, check regression-test coverage, use of established test utilities,
+skip-versus-xfail semantics, backward compatibility, and whether the patch
+introduces hidden behavioral flags or unrelated changes.
+
 ## Commit Metadata
 
 Use command-level identity instead of changing global Git configuration:
 
 ```text
-zhuyq <zhuyq@sugon.com>
+GitHub username: Zyq-gg
+GitHub user id: 70554563
+Commit identity: Zyq-gg <70554563+Zyq-gg@users.noreply.github.com>
 ```
 
 Use this subject format:
@@ -137,8 +155,9 @@ Markdown analysis; include it in the commit body when useful for reviewers.
 Commit with explicit author and committer identity:
 
 ```bash
-git -c user.name=zhuyq -c user.email=zhuyq@sugon.com \
-  commit --author="zhuyq <zhuyq@sugon.com>" \
+git -c user.name=Zyq-gg \
+  -c user.email=70554563+Zyq-gg@users.noreply.github.com \
+  commit --author="Zyq-gg <70554563+Zyq-gg@users.noreply.github.com>" \
   -m "[das-<module>] <short English description>"
 ```
 

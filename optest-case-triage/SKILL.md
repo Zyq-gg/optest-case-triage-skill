@@ -92,6 +92,8 @@ Do not push or submit to any remote unless the user explicitly asks.
 - Compare against `upstream/*` and `official/*` remote-tracking branches/tags.
 - Search official PyTorch issues, PRs, tags, and raw source when network access
   or fetched `official` refs are available and accuracy needs it.
+- Route matching failures through the relevant official PyTorch diagnostic
+  skill without loading or copying unrelated official skills.
 - Port/adapt an official fix when one exists and applies cleanly.
 - Propose or apply a minimal local fix when no official fix is found.
 - Validate the exact failing case and nearby cases when the patch touches shared
@@ -106,6 +108,9 @@ Do not push or submit to any remote unless the user explicitly asks.
   explicitly asks.
 - Do not infer commit or push authorization from a request to analyze, modify,
   or validate a case. Treat commit, push, and MR/PR creation as separate actions.
+- Treat official PyTorch skills as diagnostic references, not as permission to
+  mutate GitHub issues, labels, comments, branches, commits, or remotes. Keep
+  this skill's local-worktree and explicit-authorization boundaries.
 - Do not make broad skips, broad tolerance changes, or unrelated refactors just
   to get a case green.
 - Do not trust workbook notes as proof; use them as hypotheses to check.
@@ -328,6 +333,18 @@ numbers, commit hashes, tags, or file URLs in the Markdown record.
 ### 4. Diagnose The Root Cause
 
 Use evidence from reproduction, workbook history, source, and official search.
+Before deep diagnosis, read
+[references/official_pytorch_skills.md](references/official_pytorch_skills.md)
+and load only the matching official skill from the working repo's
+`official/main` ref. Use the pinned links when reproducibility matters and the
+live `main` links when checking for updated guidance.
+
+The official skill supplies domain-specific diagnostic methods; this skill
+still controls environment selection, dirty-worktree handling, patch scope,
+validation, Markdown output, commits, and remote mutations. In particular, do
+not inherit GitHub issue labeling/commenting/closing actions from official issue
+triage skills unless the user explicitly requests those actions.
+
 Common diagnosis categories:
 
 - Backend capability gap: HIP/ROCm/CUDA path lacks an implementation or guard.
@@ -397,6 +414,12 @@ Patch decision rules:
 ### 6. Validate
 
 Run the exact failing case again using the same environment. If the fix is in shared logic, run at least one nearby case or a narrower `-k` group.
+
+For a non-trivial runtime or test-framework patch, apply the relevant testing,
+backward-compatibility, and design checks routed from
+[references/official_pytorch_skills.md](references/official_pytorch_skills.md).
+An existing failing workbook case can serve as the regression test; add a new
+test only when the existing case does not isolate or permanently cover the bug.
 
 Record the exact command and summary result, for example:
 
@@ -481,6 +504,8 @@ Also include:
   root cause;
 - validation command and concise result;
 - not-run reason and residual risk when validation is incomplete.
+- official diagnostic skill used, its source ref/commit, and any guidance that
+  was intentionally not adopted because it conflicts with this workflow.
 
 ### 8. Commit And Hand Off Only When Requested
 
