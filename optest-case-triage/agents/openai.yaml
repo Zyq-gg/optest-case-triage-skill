@@ -1,0 +1,4 @@
+interface:
+  display_name: "Optest Case Triage"
+  short_description: "Triage one PyTorch optest case through a verified fix."
+  default_prompt: "Use $optest-case-triage to reproduce and diagnose this PyTorch optest case, find the best reference fix, validate it, document it, and create scoped commits only if I request them."
