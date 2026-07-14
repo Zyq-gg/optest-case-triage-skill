@@ -35,10 +35,11 @@ git branch --show-current
 git branch -vv
 ```
 
-Confirm that `origin` is the user's fork, `upstream` is the internal main
-repository, and `official` is the official PyTorch reference. Map a development
-branch such as `2.9.1-dev-xxx` to its target base, normally
-`upstream/2.9.1-dev`.
+Read `portable_setup.md` from this directory and map the user-fork,
+internal-main, and official-PyTorch logical roles to the configured remote
+names. The typical names are `origin`, `upstream`, and `official`, but do not
+assume them from spelling alone. Map a development branch such as
+`2.9.1-dev-xxx` to its target internal base, normally `2.9.1-dev`.
 
 Preserve all pre-existing user changes. If unrelated changes are present, leave
 them unstaged. If requested and unrelated changes overlap the same file or hunk,
@@ -47,19 +48,20 @@ clean separation is not possible.
 
 Do not switch branches with uncommitted work unless the requested workflow has
 already established how that work will be preserved. When creating a new
-development branch, refresh refs and create it from the target upstream branch:
+development branch, refresh the mapped fork and internal-main refs and create
+it from the target internal branch:
 
 ```bash
-git fetch upstream --prune
-git fetch origin --prune
-git rev-parse --short upstream/<target-branch>
+git fetch <internal-main remote> --prune
+git fetch <user-fork remote> --prune
+git rev-parse --short <internal-main remote>/<target-branch>
 git branch --list <dev-branch>
-git ls-remote --heads origin <dev-branch>
-git checkout -b <dev-branch> upstream/<target-branch>
+git ls-remote --heads <user-fork remote> <dev-branch>
+git checkout -b <dev-branch> <internal-main remote>/<target-branch>
 ```
 
-If the development branch already exists locally or on `origin`, inspect it and
-ask before reusing, deleting, or force-updating it.
+If the development branch already exists locally or on the user-fork remote,
+inspect it and ask before reusing, deleting, or force-updating it.
 
 ## Split Commits By Logical Fix
 
@@ -98,9 +100,9 @@ non-interactive, reviewable method when possible. After staging, verify that the
 cached diff contains one logical fix and that unrelated working-tree changes
 remain unstaged.
 
-Never stage validation-only modifications under
-`/usr/local/lib/python3.10/site-packages/torch`, generated caches, test outputs,
-workbooks, or Markdown files outside the repository.
+Never stage validation-only modifications under an installed Torch package
+outside the working repository, generated caches, test outputs, workbooks, or
+Markdown files outside the repository.
 
 ## Validate Before Committing
 

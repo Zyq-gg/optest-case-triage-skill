@@ -41,41 +41,24 @@ Expected output:
 - Validation result and residual risk.
 - A Markdown case record when requested or useful.
 
-Default repository and environment rules:
+Portable repository and environment rules:
 
-- Working repo for analysis, local edits, validation, and commits: use the
-  PyTorch checkout named by the user. If none is named, use the current working
-  directory when it is a PyTorch repo; otherwise prefer `/workspace/pytorch-new`
-  if present, then `/workspace/pytorch`.
-- Do not rely on separate local comparison repos. Compare against the working
-  repo's remotes instead.
-- Expected remotes in the working repo:
-  - `origin`: the user's fork. Use this for branches intended for local
-    changes, validation, commits, and pushes when explicitly requested.
-  - `upstream`: the internal/main repository. Use this for synchronization,
-    comparing branch state, and creating fresh local branches from the main
-    development line.
-  - `official`: the official PyTorch GitHub repository. Use this mainly to
-    inspect official fixes, release branches/tags, PR-linked commits, and the
-    correct upstream direction for a patch. Do not push to `official`.
-- Branch mapping rules:
-  - `origin` and `upstream` are paired by internal branch family. If the working
-    branch is `origin/2.9.1-dev` or `origin/2.9.1-dev-xxx`, compare and sync
-    against `upstream/2.9.1-dev`. Apply the same pattern for other internal
-    development branches unless the user specifies a different upstream base.
-  - `official` uses official PyTorch release branches/tags for version
-    comparison, such as `official/release/2.9` for a 2.9/2.9.1 internal branch.
-  - Because official fixes usually land first in `official/main` and may then be
-    cherry-picked only to newer release branches, always search official `main`
-    first, then newer official release branches, then the corresponding official
-    release branch. Record where the fix is present and where it is missing.
-- Typical optest workbook: `/workspace/pytorch2.12.0-optest_2_marked_newcases.xlsx`
-- Typical environment, unless the user specifies another one:
-
-```bash
-source /home/tmp/python_and_sh/env-old.sh
-cd <working PyTorch repo>
-```
+- At the start of every run, read
+  [references/portable_setup.md](references/portable_setup.md) completely.
+- Resolve `<skill-dir>` as the directory containing this `SKILL.md`; all helper
+  scripts, dependency declarations, and references are bundled under it.
+- Use the PyTorch checkout, Python environment, workbook, and output path named
+  by the user. Use the current directory/environment only after validation; do
+  not guess host-specific paths or activation scripts.
+- Treat `origin`, `upstream`, and `official` as logical remote roles. Map them by
+  URL or user instruction, fetch only configured remotes, and keep working when
+  an optional reference remote is absent.
+- Pair a fork development branch such as `2.9.1-dev-xxx` with the internal base
+  `2.9.1-dev` unless the user specifies another target. Map internal versions to
+  official releases such as `release/2.9` for version coverage.
+- Search official `main` first, then newer official releases, then the target
+  release. Use bundled official-skill guidance and live GitHub links if no local
+  official remote exists.
 
 Do not push or submit to any remote unless the user explicitly asks.
 
@@ -137,8 +120,8 @@ identity when the names differ.
 Use the helper script when useful:
 
 ```bash
-python3 /workspace/optest-case-triage-skill/optest-case-triage/scripts/find_case_in_xlsx.py \
-  --xlsx /workspace/pytorch2.12.0-optest_2_marked_newcases.xlsx \
+python3 <skill-dir>/scripts/find_case_in_xlsx.py \
+  --xlsx <workbook.xlsx> \
   --op-name test_name_or_substring
 ```
 
@@ -166,9 +149,9 @@ Run the exact pytest case from the working PyTorch repo.
 Preferred command:
 
 ```bash
-source /home/tmp/python_and_sh/env-old.sh
+<environment activation command, if provided>
 cd <working PyTorch repo>
-pytest -vs PY_NAME::CLASS_NAME::OP_NAME
+python -m pytest -vs PY_NAME::CLASS_NAME::OP_NAME
 ```
 
 Pytest paths may appear with or without the repository `test/` prefix depending
@@ -198,13 +181,9 @@ to understand the test purpose. Later diagnosis and patches must preserve that
 purpose; do not change the backend, dtype, skip condition, expected text, or
 assertion in a way that makes the test pass while testing a different behavior.
 
-If the case depends on a custom environment, source the environment first. For
-this workspace the default is:
-
-```bash
-source /home/tmp/python_and_sh/env-old.sh
-cd <working PyTorch repo>
-```
+If the case depends on a custom environment, use the activation command provided
+by the user. Otherwise keep the current environment and record `sys.executable`,
+`torch.__version__`, and `torch.__file__` before testing.
 
 For slow or flaky tests, rerun only when it materially changes confidence. If a
 test passes on rerun, classify it carefully:
@@ -230,32 +209,28 @@ First inspect the working repo state and remotes:
 ```bash
 git -C <working PyTorch repo> status --short --branch
 git -C <working PyTorch repo> remote -v
-git -C <working PyTorch repo> fetch origin --prune
-git -C <working PyTorch repo> fetch upstream --prune
-git -C <working PyTorch repo> fetch official --prune
+git -C <working PyTorch repo> branch -vv
 git -C <working PyTorch repo> log --oneline --decorate --all -- PY_NAME
 ```
 
-Use `origin` as the fork/working remote, `upstream` as the internal main remote,
-and `official` as the official PyTorch reference remote. Determine branch bases
-before comparing:
+Map the fork, internal-main, and official-PyTorch roles using
+`portable_setup.md`. Fetch only the remotes that are configured:
 
 ```bash
-git -C <working PyTorch repo> branch --show-current
-git -C <working PyTorch repo> branch -vv
-git -C <working PyTorch repo> rev-parse --short HEAD origin/INTERNAL_BRANCH upstream/BASE_BRANCH official/release/2.X
+git -C <working PyTorch repo> fetch <configured remote> --prune
+git -C <working PyTorch repo> rev-parse --short HEAD
+git -C <working PyTorch repo> rev-parse --short <remote>/<branch>
 ```
 
-For internal branches, pair `origin` and `upstream` by branch family. For
-example, a local branch based on `origin/2.9.1-dev` or
-`origin/2.9.1-dev-xxx` should usually compare against `upstream/2.9.1-dev`.
-For official PyTorch, map the internal version to the corresponding release
-branch for version coverage checks, such as `official/release/2.9` for
+For internal branches, pair the fork and internal-main roles by branch family.
+For example, a local branch based on `2.9.1-dev-xxx` should usually compare
+against the internal-main `2.9.1-dev`. For official PyTorch, map the internal
+version to the corresponding release branch, such as `release/2.9` for
 2.9/2.9.1 work.
 
 Official search order:
 
-1. Search `official/main` for the test name, file, error text, relevant
+1. Search official `main` for the test name, file, error text, relevant
    function, or changed behavior.
 2. Search newer official release branches, especially the latest fetched
    `official/release/2.X` branches. Official fixes may be present in a high
@@ -290,6 +265,11 @@ git -C <working PyTorch repo> show upstream/BASE_BRANCH:PY_NAME
 git -C <working PyTorch repo> show --stat --oneline COMMIT
 git -C <working PyTorch repo> show --unified=80 COMMIT -- PY_NAME
 ```
+
+These examples use the typical remote names. Replace them with the mapped names
+from `portable_setup.md` and skip commands whose refs are unavailable. Missing
+optional refs reduce comparison coverage but do not prevent local reproduction
+and diagnosis.
 
 When a suspected official commit is known, check which branches contain it:
 
@@ -335,9 +315,10 @@ numbers, commit hashes, tags, or file URLs in the Markdown record.
 Use evidence from reproduction, workbook history, source, and official search.
 Before deep diagnosis, read
 [references/official_pytorch_skills.md](references/official_pytorch_skills.md)
-and load only the matching official skill from the working repo's
-`official/main` ref. Use the pinned links when reproducibility matters and the
-live `main` links when checking for updated guidance.
+and use its bundled diagnostic route. If an official remote or network access
+is available, optionally refresh only the matching official skill. Use pinned
+links when reproducibility matters and live `main` links when checking for
+updated guidance. Missing optional official refs must not block diagnosis.
 
 The official skill supplies domain-specific diagnostic methods; this skill
 still controls environment selection, dirty-worktree handling, patch scope,
@@ -376,12 +357,18 @@ tree just for validation.
 
 When patching non-test PyTorch runtime source under `<working PyTorch repo>/torch/...`,
 first check which `torch` package the selected test environment imports. In this
-workspace, `env-old.sh` tests may import installed files from
-`/usr/local/lib/python3.10/site-packages/torch` rather than the working tree. If
-so, apply the same minimal runtime patch to the installed torch file for local
-validation. The Markdown record should still list the source-tree changes under
-the working repo as the changes to commit or carry to a clean environment, and
-separately mention any installed-torch patch used only for verification.
+environment, derive the active package root instead of assuming a Python or
+installation layout:
+
+```bash
+python -c "from pathlib import Path; import sys, torch; print(sys.executable); print(Path(torch.__file__).resolve().parent)"
+```
+
+Prefer the repository's supported source/build workflow. Only when the user
+explicitly requests installed-tree validation, apply the same minimal runtime
+patch to the dynamically resolved package root. The Markdown record should
+still list source-tree changes as the changes to commit and separately mention
+any installed-package patch used only for verification. Never stage that copy.
 
 Good patch patterns:
 
@@ -442,25 +429,23 @@ Validation levels:
 ### 7. Write The Markdown Record
 
 Create or update a Markdown record. When the case comes from a workbook, prefer
-one Markdown file per workbook under `/workspace`, named from the workbook
-basename with `.md` replacing `.xlsx`; for example
-`/workspace/torch291_ind_pytest_bw_analyzed.xlsx` should record into
-`/workspace/torch291_ind_pytest_bw_analyzed.md`. Append new case sections to
-that same file instead of creating case-named files, unless the user explicitly
-asks for a separate file.
+one Markdown file beside the workbook, named from the workbook basename with
+`.md` replacing `.xlsx`; for example `report.xlsx` should record into
+`report.md`. Append new case sections to that same file instead of creating
+case-named files, unless the user explicitly asks for a separate file.
 
 If there is no workbook, or the user asks for a new standalone file, create one
-under `/workspace`.
+at the user-provided path or in the current task directory.
 
 Use this section format:
 
 ````markdown
 # <workbook basename>.xlsx triage
 
-运行环境默认使用：
+运行环境：
 
 ```bash
-source /home/tmp/python_and_sh/env-old.sh
+<environment activation command, if any>
 cd <working PyTorch repo>
 ```
 
@@ -533,12 +518,12 @@ columns for the match.
 Common commands:
 
 ```bash
-python3 /workspace/optest-case-triage-skill/optest-case-triage/scripts/find_case_in_xlsx.py \
-  --xlsx /workspace/pytorch2.12.0-optest_2_marked_newcases.xlsx \
+python3 <skill-dir>/scripts/find_case_in_xlsx.py \
+  --xlsx <workbook.xlsx> \
   --op-name test_max_min_bool_cpu
 
-python3 /workspace/optest-case-triage-skill/optest-case-triage/scripts/find_case_in_xlsx.py \
-  --xlsx /workspace/pytorch2.12.0-optest_2_marked_newcases.xlsx \
+python3 <skill-dir>/scripts/find_case_in_xlsx.py \
+  --xlsx <workbook.xlsx> \
   --py-name test/test_ops.py \
   --class-name TestCommonCPU \
   --op-name test_max_min_bool_cpu \

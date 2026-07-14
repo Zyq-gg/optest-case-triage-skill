@@ -2,7 +2,7 @@
 """Find PyTorch optest cases in an Excel workbook.
 
 Examples:
-  python3 find_case_in_xlsx.py --xlsx /workspace/pytorch2.12.0-optest_2_marked_newcases.xlsx --op-name test_max_min_bool_cpu
+  python3 find_case_in_xlsx.py --xlsx report.xlsx --op-name test_max_min_bool_cpu
   python3 find_case_in_xlsx.py --xlsx report.xlsx --py-name test/test_ops.py --class-name TestCommonCPU --op-name test_max_min_bool_cpu --exact
 """
 
@@ -11,10 +11,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
-
-from openpyxl import load_workbook
-
 
 def clean(value) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
@@ -48,6 +46,15 @@ def main() -> int:
     parser.add_argument("--exact", action="store_true", help="Require exact matches for provided fields")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of readable text")
     args = parser.parse_args()
+
+    try:
+        from openpyxl import load_workbook
+    except ModuleNotFoundError:
+        requirements = Path(__file__).resolve().parents[1] / "requirements.txt"
+        parser.error(
+            "openpyxl is required; install it with "
+            f"'{sys.executable} -m pip install -r {requirements}'"
+        )
 
     wb = load_workbook(args.xlsx, data_only=True, read_only=False)
     results = []

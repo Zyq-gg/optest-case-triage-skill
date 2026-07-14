@@ -25,18 +25,21 @@ checked: 2026-07-13
 - Live catalog: https://github.com/pytorch/pytorch/tree/main/.claude/skills
 - Pinned catalog: https://github.com/pytorch/pytorch/tree/cac2394ae077cfe19d8005f37cb19d36356b2579/.claude/skills
 
-Prefer the working PyTorch repo's `official` remote so guidance updates with the
-same source used for official fix searches:
+This file contains the routing and core guidance required for offline use after
+cloning this skill repository. An official PyTorch remote is optional. When one
+is configured, map its logical role as described in `portable_setup.md` and use
+it to refresh the matching source:
 
 ```bash
-git -C <working PyTorch repo> fetch official main --prune
-git -C <working PyTorch repo> rev-parse official/main
-git -C <working PyTorch repo> show official/main:.claude/skills/<skill>/SKILL.md
+git -C <working PyTorch repo> fetch <official remote> main --prune
+git -C <working PyTorch repo> rev-parse <official remote>/main
+git -C <working PyTorch repo> show <official remote>/main:.claude/skills/<skill>/SKILL.md
 ```
 
-Record the resolved `official/main` commit in the Markdown analysis when an
-official skill materially guides the diagnosis. Use the pinned URL to explain
-the exact guidance used; use the live URL to check for newer guidance.
+If that remote is absent but network access is available, use the live or
+pinned links. If both are unavailable, use this bundled reference and continue.
+Record the resolved official commit in the Markdown analysis when refreshed
+official guidance materially guides the diagnosis.
 
 Precedence:
 

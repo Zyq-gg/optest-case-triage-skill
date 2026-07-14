@@ -22,17 +22,20 @@ commit，并推送到个人 fork。
 ```text
 optest-case-triage/
 ├── SKILL.md
+├── requirements.txt
 ├── agents/
 │   └── openai.yaml
 ├── references/
 │   ├── commit_workflow.md
-│   └── official_pytorch_skills.md
+│   ├── official_pytorch_skills.md
+│   └── portable_setup.md
 └── scripts/
     └── find_case_in_xlsx.py
 ```
 
 `SKILL.md` 是主流程。只有用户明确要求提交或推送时，agent 才会读取
-`references/commit_workflow.md`。
+`references/commit_workflow.md`。运行所需的依赖声明、环境发现规则、官方
+PyTorch skill 路由和辅助脚本都包含在这个目录中，复制或链接该目录即可使用。
 
 ## 安装
 
@@ -45,7 +48,7 @@ git clone https://github.com/Zyq-gg/optest-case-triage-skill.git
 安装工作簿查询脚本依赖：
 
 ```bash
-python3 -m pip install -r optest-case-triage-skill/requirements.txt
+python3 -m pip install -r optest-case-triage-skill/optest-case-triage/requirements.txt
 ```
 
 将 skill 目录链接到 Codex skills 目录：
@@ -65,7 +68,8 @@ cp -a optest-case-triage-skill/optest-case-triage \
 
 ## PyTorch Remote 约定
 
-工作 PyTorch 仓库应配置以下 remote：
+skill 按逻辑角色识别 PyTorch remote，下面是推荐名称，但不要求 remote 必须
+同名，也不会为了运行 skill 自动改写 remote：
 
 | Remote | 用途 |
 | --- | --- |
@@ -75,7 +79,8 @@ cp -a optest-case-triage-skill/optest-case-triage \
 
 例如本地开发分支为 `2.9.1-dev-xxx` 时，通常以
 `upstream/2.9.1-dev` 为目标基线；官方版本覆盖则对应
-`official/release/2.9`。
+`official/release/2.9`。缺少 `official` remote 时，仍可使用仓库内置的官方
+诊断路由；有网络时再通过 GitHub 固定链接或实时链接刷新资料。
 
 ## PyTorch 官方 Skills 融合
 
@@ -90,7 +95,8 @@ cp -a optest-case-triage-skill/optest-case-triage \
 
 - 指向官方 `main` 的实时链接，用于获取最新规则；
 - 指向分析基准 commit 的固定链接，用于复现当时采用的规则；
-- 通过工作 PyTorch 仓库 `official/main` 直接读取 skill 的命令。
+- 通过工作 PyTorch 仓库可选的官方 remote 直接读取 skill 的命令；
+- clone 后离线可用的核心诊断路由和检查项。
 
 这里没有把 `pytorch/pytorch` 加成 Git submodule。Git submodule 不能只指向
 `.claude/skills` 子目录，递归克隆会带入完整 PyTorch 仓库。使用 remote ref
@@ -128,20 +134,31 @@ python3 optest-case-triage/scripts/find_case_in_xlsx.py \
 
 ## 环境说明
 
-skill 当前包含该工作区常用环境：
+skill 不绑定固定容器、目录、Python 版本或环境脚本。使用时优先采用用户给出的
+工作仓库、工作簿和环境激活命令；没有明确输入时，只在当前目录通过以下特征
+验证 PyTorch 仓库：
 
-```bash
-source /home/tmp/python_and_sh/env-old.sh
+```text
+.git/
+torch/
+test/
+torch/version.py
 ```
 
-用户明确指定工作仓库或环境时，以用户输入为准。运行测试前应确认实际导入的
-`torch` 路径；如果环境从 `/usr/local/lib/python3.10/site-packages/torch`
-导入 runtime，可以同步最小修改用于验证，但该安装目录副本不能进入源码
-commit。
+运行测试前会记录 `sys.executable`、`torch.__version__` 和 `torch.__file__`。
+如需验证安装包中的 runtime 修改，路径从 `torch.__file__` 动态解析，不假设
+site-packages 布局，且验证副本不能进入源码 commit。完整规则见
+[`portable_setup.md`](optest-case-triage/references/portable_setup.md)。
 
 ## 校验
 
-使用 Codex 内置 `skill-creator` 校验器检查 skill 结构：
+clone 后可先验证辅助脚本及依赖：
+
+```bash
+python3 optest-case-triage/scripts/find_case_in_xlsx.py --help
+```
+
+若当前 Codex 安装包含内置 `skill-creator`，还可以检查 skill 结构：
 
 ```bash
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" \
