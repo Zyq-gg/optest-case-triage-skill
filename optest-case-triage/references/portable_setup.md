@@ -21,9 +21,11 @@ bundled files are relative to it:
 ```text
 <skill-dir>/requirements.txt
 <skill-dir>/scripts/find_case_in_xlsx.py
+<skill-dir>/scripts/backfill_triage_csv.py
 <skill-dir>/references/portable_setup.md
 <skill-dir>/references/official_pytorch_skills.md
 <skill-dir>/references/commit_workflow.md
+<skill-dir>/references/csv_report_backfill.md
 ```
 
 Do not reconstruct the path from a hard-coded clone location. The skill may be

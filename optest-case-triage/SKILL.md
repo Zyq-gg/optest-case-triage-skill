@@ -1,17 +1,20 @@
 ---
 name: optest-case-triage
-description: "Use when doing one-case-at-a-time PyTorch optest triage from an Excel row or pytest nodeid: read workbook context, reproduce the failure, compare history, inspect the working PyTorch repo plus its origin/upstream/official remotes for fixes, try a minimal local patch, validate, write a Markdown analysis record, and optionally split verified fixes into scoped commits for the user's fork. Complements batch log/XLSX skills; commit or push only when explicitly asked."
+description: "Use for either one-case-at-a-time PyTorch optest triage from an Excel row or pytest nodeid, or the separate post-triage task of backfilling CSV 测试目的/解决方案/最终状态/遗留原因 columns from an authoritative Markdown report plus variable auxiliary CSV columns. Reproduce, inspect official/upstream fixes, patch, validate, and document cases; safely preserve unrelated CSV fields; commit or push only when explicitly asked."
 ---
 
 # Optest Case Triage
 
 ## Overview
 
-Use this skill for deep triage of a single PyTorch optest failure. It complements
-`torch-optest-log-xlsx-skill`, which is for batch log/XLSX processing. This skill
-starts from one workbook row or pytest nodeid and carries the case through
-reproduction, source investigation, optional local patching, validation, and a
-Markdown record.
+This skill has two independent modes:
+
+1. Deep triage of a single PyTorch optest failure, starting from one workbook
+   row or pytest nodeid and ending with validation and a Markdown record.
+2. Post-triage document processing that uses a completed Markdown report as the
+   authority for safely backfilling four summary columns in a user CSV.
+
+Do not interleave the CSV backfill mode with case reproduction or patching.
 
 Use this skill when the user asks to:
 
@@ -20,17 +23,21 @@ Use this skill when the user asks to:
 - compare a case with workbook history and historical notes;
 - check whether upstream/official PyTorch already fixed the issue;
 - try a minimal local source/test patch;
-- write a case-analysis Markdown record.
+- write a case-analysis Markdown record;
+- use an existing Markdown report plus arbitrary auxiliary CSV columns to fill
+  `测试目的`, `解决方案`, `最终状态`, and `遗留原因`;
 - split verified fixes into reviewable commits and push a development branch to
   the user's fork when explicitly requested.
 
-Do not use this skill for bulk extraction from logs or marking new Excel rows;
-that belongs to `torch-optest-log-xlsx-skill`.
+Do not use this skill for bulk extraction from raw logs, creating a new failure
+workbook, or marking newly detected Excel rows; that belongs to
+`torch-optest-log-xlsx-skill`.
 
 Expected input:
 
 - An optest Excel workbook plus an op name or `(py name, class, op name)`.
 - Or a direct pytest nodeid if no workbook is involved.
+- Or a completed Markdown triage report plus the CSV to summarize.
 
 Expected output:
 
@@ -40,10 +47,12 @@ Expected output:
 - Any local patch attempted.
 - Validation result and residual risk.
 - A Markdown case record when requested or useful.
+- Or, in the separate document mode, a structurally validated CSV whose four
+  summary columns reflect the Markdown report without changing other fields.
 
-Portable repository and environment rules:
+Portable repository and environment rules for one-case triage:
 
-- At the start of every run, read
+- At the start of every one-case triage run, read
   [references/portable_setup.md](references/portable_setup.md) completely.
 - Resolve `<skill-dir>` as the directory containing this `SKILL.md`; all helper
   scripts, dependency declarations, and references are bundled under it.
@@ -59,6 +68,11 @@ Portable repository and environment rules:
 - Search official `main` first, then newer official releases, then the target
   release. Use bundled official-skill guidance and live GitHub links if no local
   official remote exists.
+
+The standalone CSV document workflow does not require a PyTorch checkout or
+runtime. Resolve `<skill-dir>`, the user-provided CSV, Markdown report, update
+plan, and output path directly from
+[references/csv_report_backfill.md](references/csv_report_backfill.md).
 
 Do not push or submit to any remote unless the user explicitly asks.
 
@@ -84,6 +98,8 @@ Do not push or submit to any remote unless the user explicitly asks.
 - Write a Markdown record with problem, analysis, fix, validation, and evidence.
 - Create logically separated commits with controlled staging and hand them off
   for an MR/PR when the user explicitly asks.
+- Backfill the four CSV summary columns from completed Markdown analysis while
+  treating auxiliary CSV conclusions as non-authoritative context.
 
 ## Boundaries
 
@@ -106,6 +122,9 @@ Do not push or submit to any remote unless the user explicitly asks.
   direction.
 - Prefer a minimal, evidence-backed patch. If a test expectation changed
   upstream, document why porting that expectation is valid.
+- In CSV backfill mode, never hard-code an auxiliary column letter such as L.
+  Discover relevant columns from headers and contents, and let current Markdown
+  evidence override conflicting historical CSV notes.
 
 ## Workflow
 
@@ -510,6 +529,30 @@ Keep these invariants:
   fixes even when they were triaged together.
 - Push only to `origin`, and only when the user explicitly requests a push.
 
+## Separate Document Workflow: Backfill CSV From Markdown
+
+This is a post-triage document task, not step 9 of the case workflow. Use it
+only when the Markdown analysis already exists and the user asks to update CSV
+summary fields.
+
+Read
+[references/csv_report_backfill.md](references/csv_report_backfill.md)
+completely. It defines:
+
+- Markdown-over-CSV evidence precedence;
+- dynamic discovery of auxiliary columns regardless of letter or position;
+- exact case matching and ambiguous-row handling;
+- concise semantics and status vocabulary for `测试目的`, `解决方案`, `最终状态`,
+  and `遗留原因`;
+- a reviewable JSON update-plan format;
+- structural validation that preserves BOM, case identity, non-target columns,
+  row order, and logical row count.
+
+Use `scripts/backfill_triage_csv.py` only after producing the semantic update
+plan. The helper deliberately does not interpret Markdown; it prevents a valid
+analysis from being applied to the wrong row or from rewriting unrelated CSV
+data.
+
 ## Helper Script
 
 `scripts/find_case_in_xlsx.py` locates workbook rows and prints all populated
@@ -533,14 +576,22 @@ python3 <skill-dir>/scripts/find_case_in_xlsx.py \
 
 Use `--json` when another script or tool should consume the result.
 
+For the separate CSV document workflow:
+
+```bash
+python3 <skill-dir>/scripts/backfill_triage_csv.py \
+  --csv <input.csv> \
+  --plan <updates.json> \
+  --dry-run
+```
+
 ## Relationship To torch-optest-log-xlsx
 
 Use `torch-optest-log-xlsx-skill` first when the user asks for bulk processing:
 
 - parse many logs;
 - create three-column or six-column Excel files;
-- mark new cases;
-- fill columns E/F/G/H across many rows.
+- mark new cases.
 
 Use this skill after that, when the user chooses one row for deep investigation:
 
@@ -549,6 +600,11 @@ Use this skill after that, when the user chooses one row for deep investigation:
 - patch locally;
 - validate;
 - write the Markdown record.
+
+Separately, use this skill's CSV report-backfill workflow after triage when the
+user wants completed Markdown conclusions summarized into the four report
+columns. That operation consumes existing analysis; it does not perform batch
+failure extraction or replace per-case validation.
 
 ## Example: Timing Test
 

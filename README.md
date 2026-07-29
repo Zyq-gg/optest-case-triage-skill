@@ -3,7 +3,9 @@
 面向 PyTorch optest 单 case 深度分析的 Codex skill。它从 Excel 行或 pytest
 nodeid 出发，完成问题复现、测试目的分析、官方修复检索、最小补丁、验证和
 Markdown 记录；在用户明确要求时，还可以把已验证修改拆分成适合评审的
-commit，并推送到个人 fork。
+commit，并推送到个人 fork。它也可在 triage 完成后，以 Markdown 为准、结合
+位置不固定的 CSV 辅助列，安全回填 `测试目的`、`解决方案`、`最终状态`、
+`遗留原因`。
 
 ## 能力
 
@@ -15,6 +17,8 @@ commit，并推送到个人 fork。
 - 在脏工作树中保留已有修改，实施范围明确的最小补丁。
 - 验证精确 case 和受共享逻辑影响的邻近 case。
 - 生成包含错误、根因、详细修改和验证结果的 Markdown 分析记录。
+- 将完成的 Markdown 分析汇总到 CSV 四个报告列，同时保持其它列、行顺序、
+  UTF-8 BOM 和逻辑行数不变。
 - 按根因拆分 commit，精确暂存，并限制 feature branch 只推送到 `origin`。
 
 ## 仓库结构
@@ -27,10 +31,14 @@ optest-case-triage/
 │   └── openai.yaml
 ├── references/
 │   ├── commit_workflow.md
+│   ├── csv_report_backfill.md
 │   ├── official_pytorch_skills.md
 │   └── portable_setup.md
-└── scripts/
-    └── find_case_in_xlsx.py
+├── scripts/
+│   ├── backfill_triage_csv.py
+│   └── find_case_in_xlsx.py
+└── tests/
+    └── test_backfill_triage_csv.py
 ```
 
 `SKILL.md` 是主流程。只有用户明确要求提交或推送时，agent 才会读取
@@ -122,6 +130,12 @@ skill 按逻辑角色识别 PyTorch remote，下面是推荐名称，但不要�
 根据根因把这些已验证修改分 commit 提交到当前开发分支，但暂时不要 push。
 ```
 
+也可以单独执行 triage 后的 CSV 文档回填，不会重新进入 case 处理流程：
+
+```text
+根据现有 CSV 的相关辅助列并以分析 Markdown 为准，填写 CSV 的测试目的、解决方案、最终状态和遗留原因。
+```
+
 ## 工作簿查询脚本
 
 ```bash
@@ -131,6 +145,17 @@ python3 optest-case-triage/scripts/find_case_in_xlsx.py \
 ```
 
 同时提供 `--py-name`、`--class-name`、`--exact` 和 `--json` 选项。
+
+CSV 回填先按
+[`csv_report_backfill.md`](optest-case-triage/references/csv_report_backfill.md)
+生成带行号和精确 case 身份的 JSON 更新计划，再执行：
+
+```bash
+python3 optest-case-triage/scripts/backfill_triage_csv.py \
+  --csv /path/to/result.csv \
+  --plan /path/to/updates.json \
+  --dry-run
+```
 
 ## 环境说明
 
@@ -156,6 +181,7 @@ clone 后可先验证辅助脚本及依赖：
 
 ```bash
 python3 optest-case-triage/scripts/find_case_in_xlsx.py --help
+python3 -m unittest discover -s optest-case-triage/tests -v
 ```
 
 若当前 Codex 安装包含内置 `skill-creator`，还可以检查 skill 结构：
