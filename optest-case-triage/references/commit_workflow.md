@@ -1,32 +1,28 @@
-# Commit Workflow
+# 提交工作流
 
-Read this reference only when the user explicitly asks to commit validated
-optest fixes, prepare a branch for review, or push to the fork.
+仅当用户明确要求提交已验证的 optest 修复、准备审查分支或推送到 fork 时，才完整阅读并执行本文。
 
-## Contents
+## 目录
 
-- [Authorization Boundaries](#authorization-boundaries)
-- [Preflight](#preflight)
-- [Split Commits By Logical Fix](#split-commits-by-logical-fix)
-- [Stage Deliberately](#stage-deliberately)
-- [Validate Before Committing](#validate-before-committing)
-- [Commit Metadata](#commit-metadata)
-- [Push And Handoff](#push-and-handoff)
+- [授权边界](#授权边界)
+- [提交前检查](#提交前检查)
+- [按逻辑修复拆分提交](#按逻辑修复拆分提交)
+- [精确暂存](#精确暂存)
+- [提交前验证](#提交前验证)
+- [提交元数据](#提交元数据)
+- [推送与交付](#推送与交付)
 
-## Authorization Boundaries
+## 授权边界
 
-- A request to analyze, modify, or validate does not authorize a commit.
-- A request to commit does not authorize a push.
-- A request to push does not authorize creating an MR/PR unless the user also
-  asks for it.
-- Never push feature branches to `upstream` or `official`. Push only to
-  `origin`, the user's fork.
-- Do not amend, rebase, force-push, delete branches, or rewrite published
-  history unless the user explicitly requests that exact operation.
+- 请求分析、修改或验证不代表授权 commit。
+- 请求 commit 不代表授权 push。
+- 请求 push 不代表授权创建 MR/PR，除非用户同时明确要求。
+- feature branch 绝不能推到 `upstream` 或 `official`；只能推到用户 fork 对应的 `origin`。
+- 未经用户明确要求相应操作，不得 amend、rebase、force-push、删除分支或重写已发布历史。
 
-## Preflight
+## 提交前检查
 
-Inspect the repository before staging anything:
+stage 前检查仓库：
 
 ```bash
 git status --short --branch
@@ -35,21 +31,11 @@ git branch --show-current
 git branch -vv
 ```
 
-Read `portable_setup.md` from this directory and map the user-fork,
-internal-main, and official-PyTorch logical roles to the configured remote
-names. The typical names are `origin`, `upstream`, and `official`, but do not
-assume them from spelling alone. Map a development branch such as
-`2.9.1-dev-xxx` to its target internal base, normally `2.9.1-dev`.
+阅读同目录 `portable_setup.md`，把用户 fork、内部主线和官方 PyTorch 逻辑角色映射到实际 remote。常见名称是 `origin`、`upstream`、`official`，但不能只按名字假定角色。将 `2.9.1-dev-xxx` 等开发分支映射到目标内部基线，通常是 `2.9.1-dev`。
 
-Preserve all pre-existing user changes. If unrelated changes are present, leave
-them unstaged. If requested and unrelated changes overlap the same file or hunk,
-separate them without discarding either change; stop for direction only when a
-clean separation is not possible.
+保留所有既有用户修改。无关变更保持 unstaged；用户要求提交的改动与同一文件或 hunk 中的无关变更重叠时，在不丢弃任何内容的前提下拆分。只有确实无法安全分离时才停止并请求用户决定。
 
-Do not switch branches with uncommitted work unless the requested workflow has
-already established how that work will be preserved. When creating a new
-development branch, refresh the mapped fork and internal-main refs and create
-it from the target internal branch:
+存在未提交工作时，不切换分支，除非当前工作流已经明确这些修改如何保存。创建新开发分支前，刷新映射后的 fork 和内部主线 ref，并从目标内部分支创建：
 
 ```bash
 git fetch <internal-main remote> --prune
@@ -60,31 +46,24 @@ git ls-remote --heads <user-fork remote> <dev-branch>
 git checkout -b <dev-branch> <internal-main remote>/<target-branch>
 ```
 
-If the development branch already exists locally or on the user-fork remote,
-inspect it and ask before reusing, deleting, or force-updating it.
+开发分支已经存在于本地或用户 fork 时，先检查内容；复用、删除或强制更新前必须询问用户。
 
-## Split Commits By Logical Fix
+## 按逻辑修复拆分提交
 
-Make each commit independently reviewable and reversible:
+每个 commit 都应能独立审查和回退：
 
-- Combine multiple cases only when they fail for the same root cause and are
-  fixed by the same coherent code change.
-- Keep independent root causes in separate commits even when they affect the
-  same test file or were analyzed in the same workbook.
-- Keep runtime behavior fixes separate from unrelated test-expectation updates,
-  environment guards, timeout changes, and build/infrastructure fixes.
-- Include focused regression tests with the runtime change they validate.
-- Do not create one catch-all commit for every currently modified file.
-- Do not split one inseparable runtime fix into artificial per-case commits.
+- 只有多个 case 的根因相同且由同一完整代码修改修复时才合并。
+- 即使影响同一测试文件或来自同一工作簿，独立根因也必须分成不同 commit。
+- runtime 行为修复与无关的测试预期、环境 guard、timeout、构建/基础设施修复分开。
+- 聚焦的 regression test 与它验证的 runtime 修改放在一起。
+- 不把当前所有 modified files 打成一个 catch-all commit。
+- 不为满足逐 case 形式而把不可分割的 runtime 修复人为拆散。
 
-Before each commit, identify its case rows/nodeids, root cause, changed files,
-and validation evidence. The Markdown record should use the same grouping and
-state whether the change is pending, committed, or intentionally not submitted.
+每次提交前列清其 case 行/nodeid、根因、文件和验证证据。Markdown 应使用相同分组，并说明修改处于待提交、已提交还是有意不提交状态。
 
-## Stage Deliberately
+## 精确暂存
 
-Review the unstaged diff and stage only the intended paths or hunks. Avoid
-`git add -A`, `git add .`, and broad staging from a dirty worktree.
+检查 unstaged diff，只 stage 目标 path 或 hunk。dirty worktree 中避免 `git add -A`、`git add .` 和其他宽泛暂存。
 
 ```bash
 git diff -- <changed-files>
@@ -95,39 +74,26 @@ git diff --cached --stat
 git diff --cached -- <changed-files>
 ```
 
-When a file contains unrelated changes, stage only the intended patch. Prefer a
-non-interactive, reviewable method when possible. After staging, verify that the
-cached diff contains one logical fix and that unrelated working-tree changes
-remain unstaged.
+文件含无关修改时，只 stage 目标 patch，并优先使用可审查的非交互方式。stage 后确认 cached diff 只包含一个逻辑修复，其他 working-tree 修改仍然 unstaged。
 
-Never stage validation-only modifications under an installed Torch package
-outside the working repository, generated caches, test outputs, workbooks, or
-Markdown files outside the repository.
+绝不 stage 工作仓库之外 installed Torch 中的验证副本、生成 cache、测试输出、工作簿或仓库外 Markdown。
 
-## Validate Before Committing
+## 提交前验证
 
-Use the validation already required by the triage workflow, then run lightweight
-repository checks on the staged patch:
+先完成 case 分析流程要求的验证，再对 staged patch 做轻量仓库检查：
 
 ```bash
 git diff --cached --check
 python -m py_compile <changed-python-files>
 ```
 
-Run the exact affected pytest cases and an appropriate neighboring case when
-shared logic changed. If the full test cannot run, record the exact blocker and
-distinguish completed static checks from unrun tests. Do not claim a commit is
-verified when its required test did not run.
+运行精确受影响 pytest；共享逻辑变化时增加合适的相邻 case。不能运行完整测试时，记录准确 blocker，区分已完成静态检查与未执行测试；不得把必要测试未运行的 commit 称为“已验证”。
 
-For non-trivial changes, read `official_pytorch_skills.md` from this directory
-and apply the routed official `pr-review` checks that match the patch. At
-minimum, check regression-test coverage, use of established test utilities,
-skip-versus-xfail semantics, backward compatibility, and whether the patch
-introduces hidden behavioral flags or unrelated changes.
+非简单修改还要阅读同目录 `official_pytorch_skills.md`，执行路由到的官方 `pr-review` 检查。至少检查 regression 覆盖、既有测试工具、skip/xfail 语义、向后兼容性，以及是否引入隐藏行为开关或无关变化。
 
-## Commit Metadata
+## 提交元数据
 
-Use command-level identity instead of changing global Git configuration:
+用命令级 identity，不修改全局 Git 配置：
 
 ```text
 GitHub username: Zyq-gg
@@ -135,13 +101,13 @@ GitHub user id: 70554563
 Commit identity: Zyq-gg <70554563+Zyq-gg@users.noreply.github.com>
 ```
 
-Use this subject format:
+subject 格式保持为：
 
 ```text
 [das-<module>] <short English description>
 ```
 
-Examples:
+示例：
 
 ```text
 [das-dynamo] Adjust standalone test timeout
@@ -149,12 +115,9 @@ Examples:
 [das-aten] Model flash attention RNG state views
 ```
 
-Choose the module from the owning area, not merely the test directory. Keep the
-subject concise and describe the behavior changed. When an official fix is the
-basis, preserve its technical direction and record the official commit/PR in the
-Markdown analysis; include it in the commit body when useful for reviewers.
+module 按代码归属领域选择，不能只看测试目录。subject 简短并描述行为变化。基于官方修复时，保持其技术方向，在 Markdown 中记录官方 commit/PR；有助于 reviewer 理解时也写入 commit body。
 
-Commit with explicit author and committer identity:
+显式设置 author 和 committer：
 
 ```bash
 git -c user.name=Zyq-gg \
@@ -163,7 +126,7 @@ git -c user.name=Zyq-gg \
   -m "[das-<module>] <short English description>"
 ```
 
-After each commit, verify its contents before starting the next one:
+每次 commit 后、开始下一提交前检查内容：
 
 ```bash
 git show --stat --oneline HEAD
@@ -171,23 +134,21 @@ git show --check HEAD
 git status --short --branch
 ```
 
-## Push And Handoff
+## 推送与交付
 
-Push only when explicitly requested:
+仅在用户明确要求时 push：
 
 ```bash
 git push -u origin <dev-branch>
 ```
 
-Do not push the development branch to `upstream` or `official`. Do not
-force-push unless explicitly authorized after showing why it is required.
+不把开发分支推到 `upstream` 或 `official`。除非用户在获知必要性后明确授权，否则不 force-push。
 
-At handoff, report:
+交付时报告：
 
-- target `upstream` branch and development branch;
-- commit hashes and subjects in order;
-- cases/root causes covered by each commit;
-- validation commands and results per commit;
-- remaining unstaged or uncommitted user changes;
-- whether the branch was pushed, and the MR/PR source and target branches when
-  applicable.
+- 目标 `upstream` 分支和开发分支；
+- 按顺序列出 commit hash 和 subject；
+- 每个 commit 覆盖的 case/根因；
+- 每个 commit 的验证命令和结果；
+- 仍存在的 unstaged/uncommitted 用户修改；
+- 是否已经 push，以及适用时 MR/PR 的 source/target branch。

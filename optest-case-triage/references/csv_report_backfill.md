@@ -1,107 +1,84 @@
-# CSV Report Backfill
+# CSV 报告回填
 
-Use this reference only for the standalone document-processing workflow that
-copies completed triage conclusions from Markdown into a user-provided CSV. Do
-not mix it into case reproduction, diagnosis, source patching, or pytest
-validation.
+本文只用于独立文档处理：把已经完成的 Markdown 分析结论写入用户提供的 CSV。不要把它混入 case 复现、根因诊断、源码修改或 pytest 验证。
 
-## Contents
+## 目录
 
-- [Purpose And Authority](#purpose-and-authority)
-- [Inspect The Inputs](#inspect-the-inputs)
-- [Build A Case Evidence Ledger](#build-a-case-evidence-ledger)
-- [Write The Four Fields](#write-the-four-fields)
-- [Create And Apply An Update Plan](#create-and-apply-an-update-plan)
-- [Validate The Result](#validate-the-result)
+- [目标与证据权威性](#目标与证据权威性)
+- [检查输入](#检查输入)
+- [建立-case-证据台账](#建立-case-证据台账)
+- [填写四个字段](#填写四个字段)
+- [创建并应用-update-plan](#创建并应用-update-plan)
+- [验证结果](#验证结果)
 
-## Purpose And Authority
+## 目标与证据权威性
 
-Use this flow when the user already has a Markdown triage report and asks to
-populate these CSV columns:
+用户已有 Markdown 分析报告并要求填写以下 CSV 列时使用本流程：
 
 - `测试目的`
 - `解决方案`
 - `最终状态`
 - `遗留原因`
 
-Apply this evidence order:
+证据优先级：
 
-1. Current, exact-case validation recorded in the Markdown report.
-2. Current root cause, fix, environment constraint, and residual risk recorded
-   in the Markdown report.
-3. Relevant auxiliary CSV columns selected by header and content.
-4. Older CSV errors, conclusions, or historical notes.
+1. Markdown 中当前、精确 case 的验证记录；
+2. Markdown 中当前根因、修复、环境约束和残余风险；
+3. 按表头和内容选出的相关 CSV 辅助列；
+4. CSV 中较旧的错误、结论或历史备注。
 
-Treat the Markdown report as authoritative when sources conflict. Auxiliary
-information such as a prior `问题结论` column is context, not proof. Its position
-is not stable: it may be column L in one file and a differently named or
-positioned column in another. Never hard-code a column letter.
+来源冲突时，以 Markdown 为准。旧 `问题结论` 等辅助字段只提供背景，不是证明。其位置不稳定，可能在某个文件的 L 列，也可能改名或移到其他位置；绝不能写死列字母。
 
-This flow summarizes completed analysis. It does not silently start a new
-one-case triage run. If the Markdown lacks enough evidence for a row, report the
-gap. When the user requires every row to be populated, use `无法验证` only with a
-specific residual reason such as `Markdown 无该精确 case 的当前验证记录`; do not
-promote an old auxiliary conclusion to a current result.
+本流程只汇总已经完成的分析，不会静默开始新一轮单 case 分析。Markdown 对某行证据不足时，应报告缺口。用户要求每行都填时，只能配合具体遗留原因使用 `无法验证`，例如 `Markdown 无该精确 case 的当前验证记录`；不能把旧辅助结论升级成当前测试结果。
 
-## Inspect The Inputs
+## 检查输入
 
-Parse the CSV with Python's `csv` module, not line-oriented shell tools. Quoted
-fields can contain commas and newlines.
+用 Python `csv` 模块解析 CSV，不能使用逐行 shell 工具；带引号字段可能包含逗号和换行。
 
-Before editing, record:
+编辑前记录：
 
-- encoding and whether a UTF-8 BOM is present;
-- delimiter, line ending, header order, column count, and logical row count;
-- the case identity columns, preferably file, class, and case/test name;
-- the positions of the four target headers by their names;
-- all potentially useful auxiliary columns based on their headers and sampled
-  values.
+- encoding，以及是否有 UTF-8 BOM；
+- delimiter、line ending、表头顺序、列数和逻辑行数；
+- case 身份列，优先选择文件、class、case/test 名；
+- 按名称定位的四个目标表头；
+- 根据表头和抽样值发现的全部潜在辅助列。
 
-The first three columns are often `test_file`, `class_name`, and `case_name`,
-but names vary. Confirm their meaning from the header and contents. Do not use
-the first three columns blindly when they are not case identity fields.
+前三列通常是 `test_file`、`class_name`、`case_name`，但实际名称可能不同。必须结合表头和内容确认含义；前三列不是身份字段时不能盲用。
 
-Read the Markdown report completely enough to cover every requested row.
-Consolidate repeated or historical sections before writing the CSV: the newest
-exact-case result wins, while older attempts remain background evidence.
+完整读取足以覆盖所有目标行的 Markdown。写 CSV 前合并重复或历史小节：最新的精确 case 结果优先，旧尝试只作为背景证据。
 
-## Build A Case Evidence Ledger
+## 建立 case 证据台账
 
-Create one internal record per logical CSV row:
+每个逻辑 CSV 行建立一条内部记录：
 
 ```text
-CSV row + exact CSV identity
-Markdown section(s) and any recorded XLSX row/nodeid
-current reproduction result
-root cause or capability limitation
-validated source fix or environment configuration
-remaining blocker or risk
-auxiliary columns consulted
+CSV 行号和精确身份
+Markdown 小节及记录的 XLSX 行/nodeid
+当前复现结果
+根因或能力限制
+已验证源码修复或环境配置
+剩余 blocker 或风险
+参考过的辅助列
 ```
 
-Match with the strongest available combination:
+按最强可用组合匹配：
 
-1. recorded spreadsheet row plus exact case identity;
-2. exact pytest nodeid;
-3. file, class, and case name together;
-4. unique case name only when uniqueness has been checked.
+1. 已记录的工作簿行号加精确 case 身份；
+2. 精确 pytest nodeid；
+3. 文件、class、case 名三者组合；
+4. 只有确认全局唯一后，才单独使用 case 名。
 
-For matching only, normalize an optional leading `test/` path prefix and trivial
-whitespace. Preserve the CSV's original identity values in the update plan.
-When duplicate names or conflicting Markdown sections remain ambiguous, do not
-guess.
+仅在匹配时规范可选的前导 `test/` 和无意义空白。update plan 中保留 CSV 的原始身份值。重复名称或 Markdown 冲突小节仍然有歧义时，不能猜测。
 
-## Write The Four Fields
+## 填写四个字段
 
-Keep every cell concise and make each column answer a different question.
+每个单元格保持简洁，并让不同列回答不同问题。
 
 ### `测试目的`
 
-State the behavior the test verifies, not its error message. Prefer the purpose
-already explained in Markdown. If absent, use a trustworthy existing purpose
-field only when it is consistent with the Markdown evidence.
+说明测试验证的行为，而不是复述错误信息。优先采用 Markdown 中已解释的目的；不存在时，只有既有 purpose 字段可信且与 Markdown 一致才可采用。
 
-Good form:
+推荐形式：
 
 ```text
 验证 FSDP 多进程训练中参数、梯度与 eager 基线一致。
@@ -109,20 +86,18 @@ Good form:
 
 ### `解决方案`
 
-State the action supported by current evidence:
+记录当前证据支持的动作：
 
-- the validated source change;
-- the required runtime/environment configuration;
-- no source change because the current environment passes;
-- a precise unsupported capability or still-needed upstream fix.
+- 已验证的源码修改；
+- 必要的 runtime/环境配置；
+- 当前环境已通过，因此无需源码修改；
+- 明确的不支持能力或仍需完成的 upstream 修复。
 
-Do not write `pass` as a solution. Distinguish a source fix from an environment
-workaround, and do not call an untested proposal a solution.
+不能把 `pass` 当成解决方案。区分源码修复和环境 workaround，也不能把未经测试的建议称为解决方案。
 
 ### `最终状态`
 
-Use a compact, consistent vocabulary. Prefer the report's established wording;
-otherwise use one of:
+使用简短、一致的词汇。优先延续报告已有措辞，否则从以下值中选择：
 
 ```text
 pass
@@ -137,26 +112,22 @@ fail（性能门限）
 无法验证
 ```
 
-Use `pass（已修复）` only when the Markdown records both the fix and a successful
-post-fix validation. Use an environment status when source code was not the
-cause. Keep `fail` when the current exact-case run still fails.
+只有 Markdown 同时记录修复和修复后成功验证时，才能写 `pass（已修复）`。源码不是根因时使用环境状态。当前精确 case 仍失败时保留 `fail`。
 
 ### `遗留原因`
 
-Describe only what remains unresolved or what constrains the conclusion:
+只写尚未解决或限制结论的因素：
 
-- no residual issue and why an older failure is obsolete;
-- current backend/hardware/version capability gap;
-- timeout, hang, performance threshold, missing resource, or missing evidence;
-- validation scope that is still incomplete.
+- 已无遗留问题，以及旧失败为何过时；
+- 当前 backend/hardware/version 能力缺口；
+- timeout、hang、性能阈值、缺少资源或证据；
+- 尚未完成的验证范围。
 
-Do not duplicate the whole solution. For resolved rows, a short form such as
-`无；当前环境已通过` or `无；修复后精确 case 已通过` is sufficient.
+不要重复整段解决方案。已解决行可写 `无；当前环境已通过` 或 `无；修复后精确 case 已通过`。
 
-## Create And Apply An Update Plan
+## 创建并应用 update plan
 
-Make semantic decisions reviewable before changing the CSV. Write a UTF-8 JSON
-plan in this form:
+修改 CSV 前，先把语义决定写成可审查的 UTF-8 JSON：
 
 ```json
 {
@@ -181,11 +152,9 @@ plan in this form:
 }
 ```
 
-Use the exact identity header names and values from the CSV. Include both the
-logical CSV row number, counting the header as row 1, and enough identity fields
-to prevent a stale plan from touching a reordered row.
+使用 CSV 中准确的身份表头和值。同时写逻辑 CSV 行号（表头计为第 1 行）和足以防止 stale plan 修改重排后错误行的身份字段。
 
-Validate without writing:
+先 dry-run，不写文件：
 
 ```bash
 python3 <skill-dir>/scripts/backfill_triage_csv.py \
@@ -194,7 +163,7 @@ python3 <skill-dir>/scripts/backfill_triage_csv.py \
   --dry-run
 ```
 
-Prefer writing a new file for review:
+默认建议生成新文件供审查：
 
 ```bash
 python3 <skill-dir>/scripts/backfill_triage_csv.py \
@@ -203,28 +172,25 @@ python3 <skill-dir>/scripts/backfill_triage_csv.py \
   --output <updated.csv>
 ```
 
-Use `--in-place` only when the user asked to update the original. The helper:
+只有用户要求覆盖原文件时使用 `--in-place`。helper 会：
 
-- resolves target columns by exact header, not fixed letters;
-- rejects missing/duplicate target headers and stale identity matches;
-- requires all four values for every planned row;
-- preserves the input BOM state and CSV dialect;
-- writes atomically;
-- reparses the output and verifies that no non-target field or unplanned row
-  changed.
+- 按精确表头而非固定字母定位目标列；
+- 拒绝缺失/重复目标表头和 stale identity；
+- 要求每个计划行都提供四个值；
+- 保留输入 BOM 状态和 CSV dialect；
+- 原子写入；
+- 重新解析输出，确认非目标字段和未计划行均未改变。
 
-## Validate The Result
+## 验证结果
 
-After writing, independently compare parsed input and output:
+写入后独立比较解析后的输入和输出：
 
-- identical headers, logical row count, width, row order, and case identities;
-- identical values in every non-target column;
-- changes only in the four target columns and only for planned rows;
-- all requested target cells are non-empty;
-- BOM, delimiter, quoting behavior, and embedded newlines remain readable;
-- each final status agrees with the newest exact-case Markdown result;
-- unresolved rows have a concrete residual reason.
+- 表头、逻辑行数、宽度、行序和 case 身份相同；
+- 每个非目标列的值相同；
+- 只有四个目标列中的计划行发生变化；
+- 所有请求的目标单元格非空；
+- BOM、delimiter、quoting 和内嵌换行仍可正确读取；
+- 每个最终状态与最新精确 case 的 Markdown 结果一致；
+- 未解决行都有具体遗留原因。
 
-Summarize the number of updated rows, status distribution, rows without adequate
-Markdown evidence, and output path. Do not claim the document is complete when
-ambiguous or unmatched rows remain.
+最后汇总更新行数、状态分布、Markdown 证据不足的行和输出路径。有歧义或未匹配行时，不得宣称文档已经完整。

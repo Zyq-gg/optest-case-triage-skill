@@ -1,4 +1,4 @@
-# Optest Case Triage Skill
+# Optest Case 分析 Skill
 
 面向 PyTorch optest 单 case 深度分析的 Codex skill。它从 Excel 行或 pytest
 nodeid 出发，完成问题复现、测试目的分析、官方修复检索、最小补丁、验证和
@@ -32,6 +32,7 @@ optest-case-triage/
 ├── references/
 │   ├── commit_workflow.md
 │   ├── csv_report_backfill.md
+│   ├── markdown_report.md
 │   ├── official_pytorch_skills.md
 │   └── portable_setup.md
 ├── scripts/
@@ -41,9 +42,12 @@ optest-case-triage/
     └── test_backfill_triage_csv.py
 ```
 
-`SKILL.md` 是主流程。只有用户明确要求提交或推送时，agent 才会读取
+`SKILL.md` 是中文主流程。工作簿对应 Markdown 的固定文档结构见
+`references/markdown_report.md`；只有用户明确要求提交或推送时，agent 才会读取
 `references/commit_workflow.md`。运行所需的依赖声明、环境发现规则、官方
 PyTorch skill 路由和辅助脚本都包含在这个目录中，复制或链接该目录即可使用。
+说明类参考文档以中文为主；命令、文件名、字段名、状态值和官方 skill 名称等
+会影响执行或匹配的标识保留英文。
 
 ## 安装
 

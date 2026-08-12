@@ -1,351 +1,283 @@
-# Markdown Triage Report Contract
+# Markdown 分析报告契约
 
-Read this reference whenever creating or updating a workbook-backed Markdown
-triage report. Apply it across environments and workbooks; do not copy literal
-paths, branch names, sheet names, row numbers, devices, versions, or case names
-from an earlier report.
+创建或更新工作簿对应的 Markdown 分析报告时，必须完整阅读本文。规则适用于不同环境和工作簿；不得从旧报告照抄实际路径、分支、sheet、行号、设备、版本或 case 名。
 
-## Contents
+## 目录
 
-- [Report Scope And Ordering](#report-scope-and-ordering)
-- [Required Report Header](#required-report-header)
-- [Required Case Structure](#required-case-structure)
-- [Code Diff Requirements](#code-diff-requirements)
-- [Commit Information Requirements](#commit-information-requirements)
-- [Consistency Checks](#consistency-checks)
-- [Portable Template](#portable-template)
+- [报告范围与顺序](#报告范围与顺序)
+- [文档头必备内容](#文档头必备内容)
+- [case-固定结构](#case-固定结构)
+- [代码-diff-要求](#代码-diff-要求)
+- [提交信息要求](#提交信息要求)
+- [一致性检查](#一致性检查)
+- [可移植模板](#可移植模板)
 
-## Report Scope And Ordering
+## 报告范围与顺序
 
-- Maintain one cumulative Markdown report beside the workbook by default:
-  `<workbook-basename>.xlsx` becomes `<workbook-basename>.md`.
-- Order case sections by workbook row number, not by diagnosis time, commit
-  order, or test file name. Reorder existing sections when necessary.
-- Group multiple rows in one case section only when they share the same root
-  cause and coherent solution, or when they are parameterized variants that
-  must be explained together. Include a row-to-nodeid table for grouped rows.
-- Keep unrelated cases in separate sections even when they modify the same
-  source file.
-- Update the existing report incrementally. Preserve correct prior evidence and
-  revise stale ordering, numbering, paths, statuses, or conclusions when new
-  analysis changes them.
-- Use exact evidence from the active environment. Never present an example,
-  recommendation, proposed patch, installed-tree validation copy, or historical
-  fix as an applied source-tree change.
+- 默认在工作簿旁维护一份累计 Markdown：`<workbook-basename>.xlsx` 对应 `<workbook-basename>.md`。
+- case 小节按工作簿行号排列，不能按诊断时间、commit 顺序或测试文件名排列；必要时重排已有小节。
+- 只有多个行共享同一根因和同一完整解决方案，或必须合并解释的参数化变体，才能归入同一个 case 小节。分组行必须提供“行号到 nodeid”映射表。
+- 不相关 case 即使修改同一源码文件，也必须分开记录。
+- 增量更新现有报告。保留正确的既有证据；新分析改变结论时，修订已过时的排序、编号、路径、状态或结论。
+- 使用当前实际环境中的精确证据。不得把示例、建议、未应用 patch、installed-tree 验证副本或历史修复描述为已经应用到源码树的修改。
 
-## Required Report Header
+## 文档头必备内容
 
-Start the document with this global information before any case section.
+所有 case 小节之前，文档开头必须包含以下全局信息。
 
-### 1. Title And Execution Environment
+### 1. 标题与运行环境
 
-Use `# <workbook filename>.xlsx triage`, then record:
+标题使用 `# <workbook filename>.xlsx 分析`，然后记录：
 
-- environment activation command, if any;
-- repository and pytest working directory;
-- Python executable and version;
-- imported PyTorch version and `torch.__file__`;
-- accelerator/runtime version such as HIP/ROCm or CUDA;
-- relevant GPU/device model;
-- test source checkout;
-- workbook path and sheet scope when the report covers only selected sheets.
+- 环境激活命令（如有）；
+- 仓库路径和 pytest 工作目录；
+- Python 可执行文件与版本；
+- 实际导入的 PyTorch 版本和 `torch.__file__`；
+- HIP/ROCm、CUDA 等 accelerator/runtime 版本；
+- 相关 GPU/device 型号；
+- 测试源码 checkout；
+- 工作簿路径；报告只覆盖部分 sheet 时写出范围。
 
-Record unknown values as `未确认` and the command needed to obtain them. Do not
-guess. Separate the source checkout from the imported runtime package because
-tests may load an installed Torch while reading test files from the repository.
+未知值写 `未确认`，并附取得该值所需命令，不得猜测。源码 checkout 与实际导入 runtime package 必须分开，因为 pytest 可能从仓库读取测试，却加载已安装的 Torch。
 
-### 2. Current Repository State
+### 2. 当前仓库状态
 
-Record a concise snapshot containing:
+记录一份简洁快照：
 
-- repository path;
-- current branch and full or abbreviated HEAD;
-- branch subject when useful;
-- mapped user-fork, internal-main, and official-PyTorch remote roles;
-- target/base branch or release used for comparison;
-- dirty-worktree state and which changes belong to this triage;
-- validation-only installed-package modifications, if any, with an explicit
-  statement that they are outside Git and must not be committed.
+- 仓库路径；
+- 当前 branch 和完整或缩写 HEAD；
+- 有帮助时记录 HEAD subject；
+- user fork、internal main、official PyTorch remote 的实际映射；
+- 用于对比的 target/base branch 或 release；
+- dirty worktree 状态，以及哪些修改属于本次分析；
+- installed package 中仅用于验证的修改（如有），并明确它们不在 Git 中、不能提交。
 
-Always record the code-submission state near this snapshot. If no source change
-exists, write `代码提交状态：无待提交修改`. If changes are proposed, applied,
-committed, or pushed, state that status and the intended/actual target branch.
+仓库快照附近必须写代码提交状态。没有源码修改时写 `代码提交状态：无待提交修改`。存在建议、已应用、已提交或已推送修改时，准确说明状态和计划/实际目标分支。
 
-When code changes exist, add one authoritative logical-change/commit table near
-the top. Use it as the single source of truth for numbering throughout the
-report:
+只要存在代码修改，就在文档顶部放一张权威“逻辑修改/提交表”，并把它作为全文编号的唯一事实来源：
 
-| Sequence | Workbook rows | Case/root cause | Source files or hunk | State |
+| 顺序 | 工作簿行 | Case/根因 | 源码文件或 hunk | 状态 |
 | --- | --- | --- | --- | --- |
-| 1 | `<rows>` | `<short diagnosis>` | `<paths and focused change>` | `<applied/uncommitted, committed HASH, proposed, or no change>` |
+| 1 | `<rows>` | `<short diagnosis>` | `<paths and focused change>` | `<已应用未提交 / 已提交 HASH / 未应用建议 / 无修改>` |
 
-Only number changes that form real logical commits. Mark optional or unapplied
-follow-ups as unnumbered unless they are actually adopted. If commits have
-already been created or pushed, update the table with commit hashes, branch,
-target branch, and push/MR status. Keep those facts synchronized with every
-case's `提交建议` section.
+只对真正构成逻辑 commit 的修改编号。可选或未应用 follow-up 在实际采纳前不编号。commit 或 push 完成后，用真实 hash、branch、target branch 和 push/MR 状态更新该表，并与每个 case 的 `提交建议` 保持一致。
 
-### 3. Global Notes When Applicable
+### 3. 适用时的全局说明
 
-Add short global notes only when they materially affect multiple cases, for
-example:
+只有确实影响多个 case 时才增加简短全局说明，例如：
 
-- installed-runtime validation policy;
-- official diagnostic routing used;
-- workbook error-log limitations;
-- a shared test runner or environment warning;
-- the distinction between applied, proposed, and no-diff solutions.
+- installed-runtime 验证策略；
+- 使用的官方诊断路线；
+- 工作簿错误日志的限制；
+- 共享 runner 或环境 warning；
+- 已应用、未应用建议和无 diff 方案之间的区别。
 
-Do not turn the header into a duplicate of every case analysis.
+不要在文档头重复每个 case 的分析。
 
-## Required Case Structure
+## case 固定结构
 
-Every case or coherent case group must use one `##` heading and exactly these
-five `###` subsections in this order.
+每个 case 或同类 case group 使用一个 `##` 标题，并严格按顺序保留以下五个 `###` 小节。
 
-Immediately below the `##` heading, write:
+`##` 标题之后立即写：
 
 ```text
-工作簿位置：工作表 `<exact sheet name>`，第 <row or row range/list> 行。
+工作簿位置：工作表 `<准确 sheet 名>`，第 <单行、范围或行号列表> 行。
 ```
 
-Use the workbook's displayed row numbers. For grouped cases, add a compact table
-with row, exact pytest nodeid, variant/input when relevant, original result, and
-final disposition. Do not say only “sheet4” if the exact sheet name is known;
-both ordinal and exact name may be recorded.
+使用工作簿显示行号。分组 case 再增加紧凑表格，至少记录行号、精确 pytest nodeid、相关 variant/input、原始结果和最终处理结果。已知准确 sheet 名时，不能只写“sheet4”；可以同时记录序号和准确名称。
 
 ### 1. 报错信息
 
-Include:
+包含：
 
-- original workbook error, status, timing, or raw-log excerpt;
-- exact reproduction command and concise result;
-- whether reproduction matches the workbook;
-- the failing sample index, dtype, device, shape, backend, generated-test
-  identity, or call site when these distinguish the failure;
-- relevant warnings, clearly separated from the actual failure condition.
+- 工作簿原始错误、状态、耗时或 raw log 摘要；
+- 精确复现命令和简洁结果；
+- 当前复现是否与工作簿一致；
+- 能区分失败的 sample index、dtype、device、shape、backend、生成测试身份或调用点；
+- 相关 warning，但要与真正失败条件分开。
 
-If the workbook has no error details or the case currently passes, state that
-directly. Do not borrow an adjacent row's error or invent a failure. Distinguish
-runner-level STALL/TIMEOUT from a test-level Python/C++ assertion when evidence
-does not connect them.
+工作簿没有错误详情或 case 当前通过时，直接说明，不能借用相邻行错误或虚构失败。证据没有建立关联时，要区分 runner 级 STALL/TIMEOUT 和测试内 Python/C++ assertion。
 
 ### 2. 测试目的与错误分析
 
-Explain from the test source outward:
+从测试源码向调用链展开说明：
 
-- where the test/template and parameterization are defined;
-- how the concrete nodeid is generated when relevant;
-- input/sample construction and important shape/dtype/device/backend values;
-- what behavior or contract the assertions protect;
-- the relevant forward/backward, dispatcher, compiler, generated-code, or
-  runtime call chain;
-- the precise failure layer and root cause;
-- why nearby warnings or similar-looking cases are or are not the same issue;
-- official PyTorch `main`/release/PR/issue/commit findings, then internal
-  upstream findings when official evidence is insufficient;
-- the final classification, such as runtime defect, test expectation drift,
-  numerical/reference mismatch, environment/data issue, capability gap, or
-  flaky observation.
+- test/template 和 parameterization 定义位置；
+- 相关时说明具体 nodeid 的生成方式；
+- input/sample 构造和关键 shape/dtype/device/backend；
+- assertion 保护的行为或 contract；
+- 相关 forward/backward、dispatcher、compiler、generated code 或 runtime 调用链；
+- 精确失败层和根因；
+- 相邻 warning 或表面相似 case 为何是或不是同一问题；
+- 先写官方 PyTorch `main`/release/PR/issue/commit 结论，官方证据不足再写内部 upstream；
+- 最终分类，如 runtime defect、测试预期漂移、数值/reference 不一致、环境/数据问题、能力缺口或 flaky。
 
-Connect every conclusion to reproduced behavior, source, history, or upstream
-evidence. Include exact links or commit hashes when available. State residual
-uncertainty rather than converting a hypothesis into fact.
+每个结论都应连接到复现、源码、历史或 upstream 证据。有链接或 commit hash 时准确记录。不确定性应作为残余不确定性明确写出，不能把假设改写成事实。
 
 ### 3. 解决方法
 
-Start by labeling the code-change state unambiguously:
+开头必须用以下一种状态明确标记代码修改情况：
 
-- `已应用源码修改`;
-- `已应用 test-only 修改`;
-- `未应用的可选方案`;
-- `当前基线已修复，无新增 diff`;
-- `仅诊断，未修改`.
+- `已应用源码修改`；
+- `已应用 test-only 修改`；
+- `未应用的可选方案`；
+- `当前基线已修复，无新增 diff`；
+- `仅诊断，未修改`。
 
-Then include:
+然后包含：
 
-- exact source-tree files changed;
-- a focused unified diff for each applied logical change;
-- analysis of how the changed fields, branches, conditions, metadata, or
-  assertions address the root cause;
-- why the solution preserves the original test purpose;
-- affected and unaffected platforms/dtypes/shapes/tests;
-- why an official approach was adopted, adapted, or intentionally not used;
-- any installed-runtime mirror used only for validation, separately labeled and
-  excluded from the commit diff.
+- 修改的准确源码树文件；
+- 每个已应用逻辑修改的聚焦 unified diff；
+- changed field、branch、condition、metadata 或 assertion 如何解决根因；
+- 方案为何保留原测试目的；
+- 受影响和不受影响的 platform/dtype/shape/test；
+- 采用、适配或有意不采用官方方案的理由；
+- 若同步修改 installed runtime 仅作验证，必须单独标记，并从待提交 diff 排除。
 
-For no-change cases, explicitly state that no source diff is pending and why.
-For proposed fixes, label the diff `未应用` and do not describe later test
-results as post-fix validation.
+无修改 case 要明确写“当前没有待提交源码 diff”以及原因。建议方案的 diff 必须标为 `未应用`，后续测试结果不能称为“修复后验证”。
 
 ### 4. 修改后的测试结果
 
-Record:
+记录：
 
-- exact activation and test commands;
-- exact case result and concise pytest summary;
-- nearby/parameterized/shared-logic regression coverage;
-- static checks such as `py_compile` and `git diff --check`;
-- whether the source-tree or a validation-only installed runtime was executed;
-- unrun tests and the exact blocker;
-- residual risk and what the completed tests do not prove.
+- 准确激活命令和测试命令；
+- 精确 case 结果与简洁 pytest summary；
+- 相邻/参数化/共享逻辑的 regression 覆盖；
+- `py_compile`、`git diff --check` 等静态检查；
+- 实际执行的是源码树还是仅验证用 installed runtime；
+- 未运行的测试和准确 blocker；
+- 残余风险，以及已完成测试不能证明什么。
 
-For cases with no code change, call this the current-baseline validation rather
-than implying a modification was tested. For skips/xfails, state whether the
-outcome is `SKIPPED`, `XFAIL`, or a real `PASS` and why that disposition is
-correct.
+无代码变化 case 应称为“当前基线验证”，不能暗示测试了某项修改。skip/xfail 要明确结果是 `SKIPPED`、`XFAIL` 还是真正 `PASS`，并解释该处理为何正确。
 
 ### 5. 提交建议
 
-Record the review boundary even when no commit is requested:
+即使用户尚未要求 commit，也要写清审查边界：
 
-- whether a commit is needed;
-- logical commit sequence from the global table;
-- case rows/root cause covered by that commit;
-- files and exact hunks to stage;
-- files/hunks that must remain unstaged;
-- suggested title and a Why/What/Impact body when appropriate;
-- validation evidence associated with the commit;
-- current state: uncommitted, committed hash, pushed branch, or MR source/target.
+- 是否需要提交；
+- 来自全局表的逻辑提交顺序；
+- 该 commit 覆盖的 case 行和根因；
+- 应 stage 的文件与准确 hunk；
+- 必须保持 unstaged 的文件/hunk；
+- 适用时给出 title 和 Why/What/Impact body；
+- 与该 commit 对应的验证证据；
+- 当前状态：uncommitted、committed hash、pushed branch 或 MR source/target。
 
-State `无需提交` for current-pass/no-change cases. Keep runtime fixes with their
-focused regression tests, and keep independent test-only fixes separate even if
-they touch the same file. Include concrete staging/commit commands only when
-useful or requested; commands must follow `commit_workflow.md` and the active
-repository's commit convention.
+当前通过且无修改的 case 写 `无需提交`。runtime 修复与其聚焦 regression test 放在一起；独立 test-only 修复即使修改同一文件也应拆开。只在有帮助或用户要求时给具体 stage/commit 命令；命令必须符合 `commit_workflow.md` 和当前仓库惯例。
 
-## Code Diff Requirements
+## 代码 diff 要求
 
-- Generate applied diffs from Git (`git diff`, `git diff --cached`, or
-  `git show`) instead of reconstructing them from memory.
-- Use repository-relative paths and unified `diff --git` blocks. Include enough
-  context to identify the function, class, or OpInfo being changed.
-- Keep the diff focused on the case's logical change. Exclude unrelated dirty
-  hunks, generated files, test logs, the workbook/report, and installed-package
-  validation copies.
-- If a long runtime fix is abbreviated, label it `精简 diff（省略未改上下文）`
-  and retain every semantically important changed field and branch. Do not use
-  an ellipsis that hides part of the fix being analyzed.
-- Follow each non-trivial diff with prose explaining the before/after state and
-  the causal connection to the failure. A diff without analysis is incomplete.
-- Never show a historical or official diff as the local applied diff. Label its
-  source commit and status explicitly.
-- Update the diff/status after commits: use `git show <hash>` when the worktree
-  no longer contains the committed patch.
+- 已应用 diff 必须由 Git 生成（`git diff`、`git diff --cached` 或 `git show`），不能凭记忆重建。
+- 使用仓库相对路径和 unified `diff --git` block，保留足以定位 function、class 或 OpInfo 的上下文。
+- diff 聚焦当前 case 的逻辑修改，排除无关 dirty hunk、generated file、test log、工作簿/报告和 installed-package 验证副本。
+- 长 runtime 修复需要缩短时，标为 `精简 diff（省略未改上下文）`，但保留所有有语义的 changed field/branch；不能用省略号隐藏待分析修复的一部分。
+- 每个非简单 diff 后必须解释修改前/后的状态和与失败的因果关系；只有 diff 没有分析不完整。
+- 历史或官方 diff 不能冒充本地已应用 diff，必须准确标明来源 commit 和状态。
+- commit 后 worktree 不再含 patch 时，用 `git show <hash>` 更新 diff 和状态。
 
-## Commit Information Requirements
+## 提交信息要求
 
-- Treat the global logical-change table as authoritative for sequence numbers.
-- Renumber all case references after inserting, removing, regrouping, or
-  reordering changes. Avoid ordinal prose such as “第三个” when a stable row,
-  case name, or commit hash is clearer.
-- Before commit, describe the proposed boundary and state `待提交`.
-- After commit, replace proposals with actual hashes/subjects and verify that
-  the committed files match the documented boundary.
-- After push, record only the branch and remote actually pushed. Do not claim an
-  MR exists merely because a creation link is available.
-- Keep optional future patches outside the numbered applied sequence until they
-  are adopted.
+- 全局逻辑修改表是序号的唯一权威来源。
+- 插入、删除、重新分组或调整顺序后，更新所有 case 引用。稳定行号、case 名或 commit hash 更清晰时，避免“第三个”等易失效序数措辞。
+- commit 前说明建议边界并标记 `待提交`。
+- commit 后用真实 hash/subject 替换建议状态，并核对实际提交文件符合记录边界。
+- push 后只记录实际推送的 branch/remote；仅有创建链接不能声称 MR 已存在。
+- 可选未来 patch 在实际采用前不进入已应用编号序列。
 
-## Consistency Checks
+## 一致性检查
 
-Before handing off the report, verify:
+交付报告前逐项确认：
 
-1. Case sections are ordered by workbook row.
-2. Every case starts with exact workbook sheet and row information.
-3. Every case has exactly the five required subsections in the required order.
-4. Applied/proposed/no-diff language matches the actual Git state.
-5. Every applied code change has a focused diff and causal analysis.
-6. Validation results correspond to the code state described in section 3.
-7. Global commit sequence, per-case sequence, commit hashes, branches, and
-   submission status agree everywhere.
-8. Similar cases are grouped only when root cause and solution are coherent;
-   otherwise their distinction is explicit.
-9. Markdown code fences are paired, tables render, links point to the intended
-   source, and paths are portable or clearly environment-specific evidence.
-10. No unrelated user changes, installed-runtime copies, workbooks, reports, or
-    caches are described as repository changes to submit.
+1. case 小节按工作簿行号排序。
+2. 每个 case 开头都有准确工作表和行号。
+3. 每个 case 严格包含五个固定小节，顺序正确。
+4. 已应用/未应用/无 diff 的措辞与实际 Git 状态一致。
+5. 每项已应用代码修改都有聚焦 diff 和因果分析。
+6. 验证结果对应第 3 节描述的同一代码状态。
+7. 全局提交序号、逐 case 序号、hash、branch 和提交状态全文一致。
+8. 相似 case 只有根因和方案一致时才分组，否则明确区别。
+9. Markdown code fence 成对、table 可渲染、link 指向目标源码，path 可移植或明确标为特定环境证据。
+10. 无关用户修改、installed-runtime 副本、工作簿、报告或 cache 没有被描述成待提交仓库修改。
 
-## Portable Template
+## 可移植模板
 
-Use this skeleton and expand it with evidence. Omit optional global notes when
-they do not apply, but never omit the five case subsections.
+使用以下骨架并补充证据。没有全局说明时可省略可选项，但五个 case 小节绝不能省略。
 
 ````markdown
-# <workbook filename>.xlsx triage
+# <工作簿文件名>.xlsx 分析
 
 运行环境：
 
 ```bash
-<activation command, if any>
-cd <pytest working directory>
+<环境激活命令，如有>
+cd <pytest 工作目录>
 ```
 
-- Python: `<executable>` (`<version>`)
-- 运行时 PyTorch: `<version>`，`<torch.__file__>`
-- 加速栈: `<HIP/ROCm or CUDA version>`
-- GPU/设备: `<model>`
-- 测试源码: `<repository/test path>`
-- 工作簿范围: `<workbook path; selected sheets if applicable>`
+- Python：`<可执行文件>`（`<版本>`）
+- 运行时 PyTorch：`<版本>`，`<torch.__file__>`
+- 加速栈：`<HIP/ROCm 或 CUDA 版本>`
+- GPU/设备：`<型号>`
+- 测试源码：`<仓库/测试路径>`
+- 工作簿范围：`<工作簿路径；适用时写选定 sheet>`
 
 当前仓库状态：
 
 ```text
-repo: <path>
-branch: <branch>
-HEAD: <hash and subject>
-target/base: <remote role and branch>
-working tree: <clean or scoped dirty changes>
-remotes: <mapped fork/internal/official roles>
-代码提交状态: <无待提交修改 / planned changes / applied-uncommitted / committed / pushed; target branch>
+repo: <路径>
+branch: <分支>
+HEAD: <hash 和 subject>
+target/base: <remote 角色和分支>
+working tree: <clean 或范围明确的 dirty changes>
+remotes: <已映射 fork/internal/official 角色>
+代码提交状态: <无待提交修改 / 计划修改 / 已应用未提交 / 已提交 / 已推送；目标分支>
 ```
 
-<installed-runtime validation note, if any>
+<installed-runtime 验证说明，如有>
 
-| Sequence | Workbook rows | Case/root cause | Source files or hunk | State |
+| 顺序 | 工作簿行 | Case/根因 | 源码文件或 hunk | 状态 |
 | --- | --- | --- | --- | --- |
-| 1 | `<rows>` | `<root cause>` | `<files/change>` | `<state/hash>` |
+| 1 | `<行号>` | `<根因>` | `<文件/修改>` | `<状态/hash>` |
 
-## <case or coherent case-group name>
+## <case 或同类 case group 名>
 
-工作簿位置：工作表 `<exact sheet name>`，第 `<rows>` 行。
+工作簿位置：工作表 `<准确 sheet 名>`，第 `<行号>` 行。
 
-<optional row/nodeid mapping table>
+<可选：行号/nodeid 映射表>
 
 ### 1. 报错信息
 
-<workbook evidence, reproduction command/result, match status>
+<工作簿证据、复现命令/结果、匹配状态>
 
 ### 2. 测试目的与错误分析
 
-<test source, generation/call path, purpose, evidence, root cause, official/internal findings>
+<测试源码、生成/调用链、目的、证据、根因、官方/内部检索结论>
 
 ### 3. 解决方法
 
 状态：`<已应用源码修改 / 已应用 test-only 修改 / 未应用的可选方案 / 当前基线已修复，无新增 diff / 仅诊断，未修改>`
 
-修改文件：`<repository-relative paths or 无>`
+修改文件：`<仓库相对路径或无>`
 
 ```diff
 diff --git a/<path> b/<path>
-<focused actual or explicitly labeled proposed diff>
+<聚焦的实际 diff，或明确标记的未应用建议 diff>
 ```
 
-<before/after behavior and causal analysis; scope and alternatives>
+<修改前后行为和因果分析；影响范围与备选方案>
 
 ### 4. 修改后的测试结果
 
 ```bash
-<exact validation commands>
+<准确验证命令>
 ```
 
 ```text
-<concise exact result>
+<准确简洁结果>
 ```
 
-<neighbor checks, static checks, runtime source, residual risk>
+<相邻检查、静态检查、runtime 来源、残余风险>
 
 ### 5. 提交建议
 
-<commit boundary/order/state, title/body, staged and excluded hunks, hash/branch if completed>
+<提交边界/顺序/状态、title/body、stage 与排除的 hunk、已完成时写 hash/branch>
 ````

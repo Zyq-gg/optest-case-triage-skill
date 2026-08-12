@@ -1,4 +1,4 @@
 interface:
-  display_name: "Optest Case Triage"
-  short_description: "Triage PyTorch optest cases and backfill CSV reports."
-  default_prompt: "Use $optest-case-triage to diagnose and document this PyTorch optest case, or safely backfill my CSV summary columns from its authoritative Markdown report."
+  display_name: "Optest Case 分析"
+  short_description: "逐项分析 PyTorch optest case，并安全回填 CSV 报告。"
+  default_prompt: "使用 $optest-case-triage 分析并记录这个 PyTorch optest case，或依据权威 Markdown 安全回填 CSV 汇总列。"
