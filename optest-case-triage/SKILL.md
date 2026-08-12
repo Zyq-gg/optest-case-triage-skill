@@ -46,7 +46,8 @@ Expected output:
 - Any upstream/official fix evidence found.
 - Any local patch attempted.
 - Validation result and residual risk.
-- A Markdown case record when requested or useful.
+- A cumulative workbook Markdown report with a reproducible environment/repo
+  header and consistent five-part case records when requested or useful.
 - Or, in the separate document mode, a structurally validated CSV whose four
   summary columns reflect the Markdown report without changing other fields.
 
@@ -95,7 +96,9 @@ Do not push or submit to any remote unless the user explicitly asks.
 - Propose or apply a minimal local fix when no official fix is found.
 - Validate the exact failing case and nearby cases when the patch touches shared
   behavior.
-- Write a Markdown record with problem, analysis, fix, validation, and evidence.
+- Write a row-ordered Markdown report with environment/repository/commit state
+  and five-part case records containing evidence, focused diffs, validation,
+  residual risk, and review boundaries.
 - Create logically separated commits with controlled staging and hand them off
   for an MR/PR when the user explicitly asks.
 - Backfill the four CSV summary columns from completed Markdown analysis while
@@ -456,60 +459,44 @@ case-named files, unless the user explicitly asks for a separate file.
 If there is no workbook, or the user asks for a new standalone file, create one
 at the user-provided path or in the current task directory.
 
-Use this section format:
+Before writing or revising a workbook-backed report, read
+[references/markdown_report.md](references/markdown_report.md) completely and
+follow its report contract and portable template. It is the authoritative
+output schema for this workflow.
 
-````markdown
-# <workbook basename>.xlsx triage
+Required invariants include:
 
-运行环境：
+- Start the document with the execution environment, imported runtime, current
+  repository/remote/base state, dirty changes, validation-only installed-tree
+  copies, and code-submission/target-branch status. Add a single authoritative
+  logical-change/commit table when code changes exist; state explicitly when
+  there is no pending source change.
+- Order case sections by workbook row. Start every case/group with the exact
+  sheet name and row/range/list, and add a row-to-nodeid table for grouped
+  parameterized cases.
+- Give every case exactly five subsections in this order: `报错信息`,
+  `测试目的与错误分析`, `解决方法`, `修改后的测试结果`, and `提交建议`.
+- In `解决方法`, explicitly distinguish applied source changes, applied
+  test-only changes, unapplied proposals, current-baseline/no-diff cases, and
+  diagnosis-only cases. Include a focused Git-derived unified diff for every
+  applied change and explain the before/after behavior and causal link.
+- Keep source-tree diffs separate from installed-package mirrors used only for
+  validation. Never present an official/historical/proposed diff as a locally
+  applied patch.
+- In `修改后的测试结果`, record exact commands, results, adjacent coverage,
+  static checks, runtime source, blockers, and residual risk. Do not describe a
+  baseline pass as a post-fix pass.
+- In `提交建议`, preserve the same logical grouping and sequence as the global
+  table; state files/hunks to stage and exclude, commit status/hash/branch when
+  known, and `无需提交` for no-change cases.
+- Before handoff, audit row ordering, five-section completeness, code-fence
+  pairing, diff/status accuracy, validation state, and global/per-case commit
+  numbering consistency.
 
-```bash
-<environment activation command, if any>
-cd <working PyTorch repo>
-```
-
-当前仓库同步状态：
-
-```text
-<branch/commit/remote summary>
-```
-
-## <op name>
-
-1. 报错信息
-
-   <workbook error and reproduction error>
-
-2. 测试目的与错误分析
-
-   <what the test verifies, why it failed, history/GCC relevance, upstream/official search result>
-
-3. 解决方法
-
-   <files changed; what changed from old behavior/code to new behavior/code;
-   before/after snippets or a focused diff when useful; key code analysis;
-   why this fix is preferred and how it preserves the test purpose>
-
-4. 修改后的测试结果
-
-   <commands and results, or not-run reason>
-```
-````
-
-When an official PR/issue/source was checked, include the result in section 2. If no official fix exists, explicitly say so.
-
-Also include:
-
-- workbook sheet/row when available;
-- exact reproduction command;
-- exact changed files if a patch was attempted;
-- detailed solution notes: changed files, before/after behavior, focused diff
-  or code snippets, and the key reasoning that connects the code change to the
-  root cause;
-- validation command and concise result;
-- not-run reason and residual risk when validation is incomplete.
-- official diagnostic skill used, its source ref/commit, and any guidance that
-  was intentionally not adopted because it conflicts with this workflow.
+When an official PR/issue/source was checked, include the result in section 2.
+If no official fix exists, explicitly say so. Record the official diagnostic
+skill used, its source ref/commit, and any guidance intentionally not adopted
+because it conflicts with this workflow.
 
 ### 8. Commit And Hand Off Only When Requested
 
