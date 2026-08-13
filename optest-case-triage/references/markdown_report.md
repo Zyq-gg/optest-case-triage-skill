@@ -35,22 +35,32 @@
 - 实际导入的 PyTorch 版本和 `torch.__file__`；
 - HIP/ROCm、CUDA 等 accelerator/runtime 版本；
 - 相关 GPU/device 型号；
-- 测试源码 checkout；
+- 编译仓、代码记录仓和安装验证仓；
+- 测试源码实际来自哪个 checkout；
 - 工作簿路径；报告只覆盖部分 sheet 时写出范围。
 
-未知值写 `未确认`，并附取得该值所需命令，不得猜测。源码 checkout 与实际导入 runtime package 必须分开，因为 pytest 可能从仓库读取测试，却加载已安装的 Torch。
+未知值写 `未确认`，并附取得该值所需命令，不得猜测。三类仓库必须分别记录，即使路径相同也要写明“编译仓 = 代码记录仓”等关系。测试源码 checkout 与实际导入 runtime package 必须分开，因为 pytest 可能从仓库读取测试，却加载已安装的 Torch。
+
+推荐使用以下表格记录三类仓库：
+
+| 仓库角色 | 路径 | 用途 | branch/HEAD 或版本 | dirty/验证状态 | 是否可提交 |
+| --- | --- | --- | --- | --- | --- |
+| 编译仓 | `<compile-repo>` | 构建源码、生成 build 产物、运行依赖编译结果的测试 | `<branch>/<HEAD>` | `<状态>` | `否；除非与代码记录仓相同` |
+| 代码记录仓 | `<code-record-repo>` | 保存 case 修改、生成 Git diff、commit 和 push | `<branch>/<HEAD>` | `<状态>` | `是，唯一提交来源` |
+| 安装验证仓 | `<Path(torch.__file__).resolve().parent>` | pytest 实际导入的 runtime 验证 | `<torch version>` | `<validation-only 状态>` | `否；允许保留有效验证修改` |
 
 ### 2. 当前仓库状态
 
 记录一份简洁快照：
 
 - 仓库路径；
+- 编译仓、代码记录仓、安装验证仓的路径和角色关系；
 - 当前 branch 和完整或缩写 HEAD；
 - 有帮助时记录 HEAD subject；
 - user fork、internal main、official PyTorch remote 的实际映射；
 - 用于对比的 target/base branch 或 release；
 - dirty worktree 状态，以及哪些修改属于本次分析；
-- installed package 中仅用于验证的修改（如有），并明确它们不在 Git 中、不能提交。
+- 编译仓中的临时同步 patch、build 产物，以及安装验证仓中仅用于验证的修改（如有），并明确它们不在代码记录仓 Git 中、不能提交；安装验证仓中验证有效的修改可以保留，用于用户后续复测。
 
 仓库快照附近必须写代码提交状态。没有源码修改时写 `代码提交状态：无待提交修改`。存在建议、已应用、已提交或已推送修改时，准确说明状态和计划/实际目标分支。
 
@@ -66,7 +76,7 @@
 
 只有确实影响多个 case 时才增加简短全局说明，例如：
 
-- installed-runtime 验证策略；
+- 编译仓构建策略和安装验证仓验证策略；
 - 使用的官方诊断路线；
 - 工作簿错误日志的限制；
 - 共享 runner 或环境 warning；
@@ -126,13 +136,14 @@
 
 然后包含：
 
-- 修改的准确源码树文件；
-- 每个已应用逻辑修改的聚焦 unified diff；
+- 代码记录仓中修改的准确源码文件；
+- 每个已应用逻辑修改的聚焦 unified diff（必须从代码记录仓的 `git diff`、`git diff --cached` 或 `git show` 生成）；
+- 若为编译验证，编译仓同步了哪些文件、基线是什么、运行了什么构建命令；
 - changed field、branch、condition、metadata 或 assertion 如何解决根因；
 - 方案为何保留原测试目的；
 - 受影响和不受影响的 platform/dtype/shape/test；
 - 采用、适配或有意不采用官方方案的理由；
-- 若同步修改 installed runtime 仅作验证，必须单独标记，并从待提交 diff 排除。
+- 若同步修改编译仓或安装验证仓仅作验证，必须单独标记，并从代码记录仓待提交 diff 排除。安装验证仓中已验证有效的修改可以保留，但必须标记为“保留的 validation-only 修改”；三者 patch 不一致时，不能称作同一修复。
 
 无修改 case 要明确写“当前没有待提交源码 diff”以及原因。建议方案的 diff 必须标为 `未应用`，后续测试结果不能称为“修复后验证”。
 
@@ -144,7 +155,8 @@
 - 精确 case 结果与简洁 pytest summary；
 - 相邻/参数化/共享逻辑的 regression 覆盖；
 - `py_compile`、`git diff --check` 等静态检查；
-- 实际执行的是源码树还是仅验证用 installed runtime；
+- 测试源码来自哪个仓库、编译产物来自哪个编译仓、实际 runtime 来自哪个安装验证仓；
+- 编译命令、安装/同步命令及其结果（如有）；
 - 未运行的测试和准确 blocker；
 - 残余风险，以及已完成测试不能证明什么。
 
@@ -197,7 +209,7 @@
 7. 全局提交序号、逐 case 序号、hash、branch 和提交状态全文一致。
 8. 相似 case 只有根因和方案一致时才分组，否则明确区别。
 9. Markdown code fence 成对、table 可渲染、link 指向目标源码，path 可移植或明确标为特定环境证据。
-10. 无关用户修改、installed-runtime 副本、工作簿、报告或 cache 没有被描述成待提交仓库修改。
+10. 无关用户修改、编译仓临时 patch/build 产物、installed-runtime 副本、工作簿、报告或 cache 没有被描述成代码记录仓待提交修改。
 
 ## 可移植模板
 
@@ -220,19 +232,27 @@ cd <pytest 工作目录>
 - 测试源码：`<仓库/测试路径>`
 - 工作簿范围：`<工作簿路径；适用时写选定 sheet>`
 
+仓库角色：
+
+| 仓库角色 | 路径 | 用途 | branch/HEAD 或版本 | dirty/验证状态 | 是否可提交 |
+| --- | --- | --- | --- | --- | --- |
+| 编译仓 | `<compile-repo>` | 构建和运行测试 | `<branch>/<HEAD>` | `<状态>` | `否；除非与代码记录仓相同` |
+| 代码记录仓 | `<code-record-repo>` | 保存 diff、commit 和 push | `<branch>/<HEAD>` | `<状态>` | `是，唯一提交来源` |
+| 安装验证仓 | `<torch.__file__ 所在目录>` | 实际导入 runtime 验证 | `<torch version>` | `<validation-only 状态>` | `否；允许保留有效验证修改` |
+
 当前仓库状态：
 
 ```text
-repo: <路径>
-branch: <分支>
-HEAD: <hash 和 subject>
+compile-repo: <路径、branch、HEAD>
+code-record-repo: <路径、branch、HEAD>
+validation-repo: <torch.__file__ 所在目录和版本>
 target/base: <remote 角色和分支>
-working tree: <clean 或范围明确的 dirty changes>
+working tree: <三类仓库各自 clean 或范围明确的 dirty changes>
 remotes: <已映射 fork/internal/official 角色>
 代码提交状态: <无待提交修改 / 计划修改 / 已应用未提交 / 已提交 / 已推送；目标分支>
 ```
 
-<installed-runtime 验证说明，如有>
+<编译命令、编译产物来源、安装/同步命令，以及可保留的 validation-only 修改说明，如有>
 
 | 顺序 | 工作簿行 | Case/根因 | 源码文件或 hunk | 状态 |
 | --- | --- | --- | --- | --- |
@@ -256,14 +276,14 @@ remotes: <已映射 fork/internal/official 角色>
 
 状态：`<已应用源码修改 / 已应用 test-only 修改 / 未应用的可选方案 / 当前基线已修复，无新增 diff / 仅诊断，未修改>`
 
-修改文件：`<仓库相对路径或无>`
+修改文件（代码记录仓）：`<仓库相对路径或无>`
 
 ```diff
 diff --git a/<path> b/<path>
 <聚焦的实际 diff，或明确标记的未应用建议 diff>
 ```
 
-<修改前后行为和因果分析；影响范围与备选方案>
+<修改前后行为和因果分析；影响范围与备选方案；如需编译，说明编译仓同步 patch；如需安装包验证，说明安装验证仓同步 patch>
 
 ### 4. 修改后的测试结果
 

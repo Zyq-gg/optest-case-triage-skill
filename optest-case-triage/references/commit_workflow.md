@@ -31,7 +31,7 @@ git branch --show-current
 git branch -vv
 ```
 
-阅读同目录 `portable_setup.md`，把用户 fork、内部主线和官方 PyTorch 逻辑角色映射到实际 remote。常见名称是 `origin`、`upstream`、`official`，但不能只按名字假定角色。将 `2.9.1-dev-xxx` 等开发分支映射到目标内部基线，通常是 `2.9.1-dev`。
+阅读同目录 `portable_setup.md`，先区分编译仓、代码记录仓和安装验证仓。代码记录仓是唯一的 diff、commit 和 push 来源；编译仓中的同步 patch/build 产物不提交；安装验证仓中验证有效的 runtime 修改可以保留供用户后续复测，但仍属于 validation-only。随后把用户 fork、内部主线和官方 PyTorch 逻辑角色映射到实际 remote。常见名称是 `origin`、`upstream`、`official`，但不能只按名字假定角色。将 `2.9.1-dev-xxx` 等开发分支映射到目标内部基线，通常是 `2.9.1-dev`。
 
 保留所有既有用户修改。无关变更保持 unstaged；用户要求提交的改动与同一文件或 hunk 中的无关变更重叠时，在不丢弃任何内容的前提下拆分。只有确实无法安全分离时才停止并请求用户决定。
 
@@ -76,7 +76,7 @@ git diff --cached -- <changed-files>
 
 文件含无关修改时，只 stage 目标 patch，并优先使用可审查的非交互方式。stage 后确认 cached diff 只包含一个逻辑修复，其他 working-tree 修改仍然 unstaged。
 
-绝不 stage 工作仓库之外 installed Torch 中的验证副本、生成 cache、测试输出、工作簿或仓库外 Markdown。
+绝不 stage 安装验证仓中的验证副本、编译仓 build 产物/临时镜像、生成 cache、测试输出、工作簿或代码记录仓之外的 Markdown。
 
 ## 提交前验证
 

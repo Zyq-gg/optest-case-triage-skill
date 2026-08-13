@@ -48,7 +48,7 @@ description: "用于逐项分析 PyTorch optest Excel 行或 pytest nodeid，以
 每次进行单 case 分析，首先完整阅读 [references/portable_setup.md](references/portable_setup.md)。
 
 - `<skill-dir>` 表示本 `SKILL.md` 所在目录；脚本、依赖声明和参考文档都从该目录解析。
-- 使用用户指定的 PyTorch 仓库、Python 环境、工作簿和输出路径。只有验证后才能采用当前目录或当前环境，不猜测固定主机路径和激活脚本。
+- 使用用户指定的编译仓、代码记录仓、Python 环境、工作簿和输出路径。每次分析都明确区分编译仓、代码记录仓和安装验证仓；三者相同时仍分别记录角色。只有验证后才能采用当前目录或当前环境，不猜测固定主机路径和激活脚本。详细规则见 [references/portable_setup.md](references/portable_setup.md)。
 - 将 `origin`、`upstream`、`official` 视为逻辑角色，按 URL 或用户说明映射；只 fetch 已配置 remote，缺少可选参考 remote 时继续完成可执行的本地分析。
 - fork 开发分支（例如 `2.9.1-dev-xxx`）通常对应内部基线 `2.9.1-dev`；除非用户另有指定。内部版本再映射到官方发布线（例如 `release/2.9`）判断覆盖情况。
 - 官方检索顺序是 `main`、较新的 release、目标 release。没有本地 official remote 时，使用本 skill 的官方技能指引和实时 GitHub 链接。
@@ -104,11 +104,11 @@ python3 <skill-dir>/scripts/find_case_in_xlsx.py \
 
 ### 2. 复现 case
 
-在工作 PyTorch 仓库中运行精确 pytest：
+在编译仓中运行精确 pytest；如果编译仓和代码记录仓相同则直接在该 checkout 运行：
 
 ```bash
 <用户提供的环境激活命令，如有>
-cd <working PyTorch repo>
+cd <compile-repo>
 python -m pytest -vs PY_NAME::CLASS_NAME::OP_NAME
 ```
 
@@ -127,7 +127,9 @@ pytest -vs PY_NAME -k OP_NAME
 
 记录通过/失败、简洁异常、耗时、生成代码路径、warning、编译/链接信息，以及当前错误是否与工作簿一致。
 
-复现时同时阅读测试函数和相关 helper，明确测试目的。后续不得通过切换 backend、dtype、skip 条件、预期文本或断言，使测试虽然通过却不再测试原语义。
+复现时同时阅读代码记录仓或编译仓中的测试函数和相关 helper，明确测试目的。后续不得通过切换 backend、dtype、skip 条件、预期文本或断言，使测试虽然通过却不再测试原语义。
+
+如果测试文件只在代码记录仓被修改，而测试需要编译产物才能看到修改，先把同一 patch 同步到编译仓并重新构建；如果只需要 Python 测试文件变化，则可直接从相应 checkout 运行，但报告必须写明测试源码来源。安装验证仓中验证有效的 runtime 修改默认保留，不自动回退，以便用户后续复测；它仍然不能进入代码记录仓 commit。
 
 若用户提供环境激活命令，使用该命令。否则保留当前环境，并记录 `sys.executable`、`torch.__version__`、`torch.__file__`。
 
@@ -141,21 +143,24 @@ pytest -vs PY_NAME -k OP_NAME
 
 设计本地修复前，必须先找官方方案。若官方 commit、PR、issue 或 release 变更能解释失败，优先移植或最小化适配；官方证据不足时，再把内部 `upstream` 作为主要参考。
 
-先检查工作仓库：
+先检查代码记录仓，并同步确认编译仓和安装验证仓：
 
 ```bash
-git -C <working PyTorch repo> status --short --branch
-git -C <working PyTorch repo> remote -v
-git -C <working PyTorch repo> branch -vv
-git -C <working PyTorch repo> log --oneline --decorate --all -- PY_NAME
+git -C <code-record-repo> status --short --branch
+git -C <code-record-repo> remote -v
+git -C <code-record-repo> branch -vv
+git -C <code-record-repo> log --oneline --decorate --all -- PY_NAME
+git -C <compile-repo> status --short --branch
+git -C <compile-repo> rev-parse HEAD
+python -c "from pathlib import Path; import torch; print(Path(torch.__file__).resolve().parent)"
 ```
 
 按 `portable_setup.md` 映射 fork、内部主线和官方 PyTorch，只 fetch 已配置 remote：
 
 ```bash
-git -C <working PyTorch repo> fetch <configured remote> --prune
-git -C <working PyTorch repo> rev-parse --short HEAD
-git -C <working PyTorch repo> rev-parse --short <remote>/<branch>
+git -C <code-record-repo> fetch <configured remote> --prune
+git -C <code-record-repo> rev-parse --short HEAD
+git -C <code-record-repo> rev-parse --short <remote>/<branch>
 ```
 
 官方检索顺序：
@@ -171,14 +176,14 @@ git -C <working PyTorch repo> rev-parse --short <remote>/<branch>
 不要为比较而 checkout 覆盖 dirty worktree，可使用：
 
 ```bash
-git -C <working PyTorch repo> diff upstream/BASE_BRANCH...HEAD -- PY_NAME
-git -C <working PyTorch repo> diff official/release/2.X..official/main -- PY_NAME
-git -C <working PyTorch repo> diff official/release/2.X..official/release/NEWER_2.X -- PY_NAME
-git -C <working PyTorch repo> diff upstream/BASE_BRANCH..upstream/NEWER_DEV_BRANCH -- PY_NAME
-git -C <working PyTorch repo> show official/main:PY_NAME
-git -C <working PyTorch repo> show upstream/BASE_BRANCH:PY_NAME
-git -C <working PyTorch repo> show --stat --oneline COMMIT
-git -C <working PyTorch repo> show --unified=80 COMMIT -- PY_NAME
+git -C <code-record-repo> diff upstream/BASE_BRANCH...HEAD -- PY_NAME
+git -C <code-record-repo> diff official/release/2.X..official/main -- PY_NAME
+git -C <code-record-repo> diff official/release/2.X..official/release/NEWER_2.X -- PY_NAME
+git -C <code-record-repo> diff upstream/BASE_BRANCH..upstream/NEWER_DEV_BRANCH -- PY_NAME
+git -C <code-record-repo> show official/main:PY_NAME
+git -C <code-record-repo> show upstream/BASE_BRANCH:PY_NAME
+git -C <code-record-repo> show --stat --oneline COMMIT
+git -C <code-record-repo> show --unified=80 COMMIT -- PY_NAME
 ```
 
 remote 名只是示例，必须替换成实际映射；缺少可选 ref 只降低对比覆盖，不阻止本地复现和诊断。
@@ -186,10 +191,10 @@ remote 名只是示例，必须替换成实际映射；缺少可选 ref 只降�
 已知候选 commit 时检查分支覆盖：
 
 ```bash
-git -C <working PyTorch repo> branch -r --contains COMMIT
-git -C <working PyTorch repo> merge-base --is-ancestor COMMIT official/main
-git -C <working PyTorch repo> merge-base --is-ancestor COMMIT official/release/NEWER_2.X
-git -C <working PyTorch repo> merge-base --is-ancestor COMMIT upstream/BASE_BRANCH
+git -C <code-record-repo> branch -r --contains COMMIT
+git -C <code-record-repo> merge-base --is-ancestor COMMIT official/main
+git -C <code-record-repo> merge-base --is-ancestor COMMIT official/release/NEWER_2.X
+git -C <code-record-repo> merge-base --is-ancestor COMMIT upstream/BASE_BRANCH
 ```
 
 需要联网检索时，以官方 PyTorch 来源为先：
@@ -229,13 +234,13 @@ git -C <working PyTorch repo> merge-base --is-ancestor COMMIT upstream/BASE_BRAN
 
 只修改解决当前问题所需代码，并保留用户和已有本地变更。参考优先级：精确官方修复、相关官方方向、较新内部 upstream、目标分支本地推理。
 
-测试文件只需改工作源码树。修改 `<working PyTorch repo>/torch/...` runtime 前，先确认测试环境实际导入的 torch：
+所有 case 修改先记录在代码记录仓。测试文件可在代码记录仓修改；需要编译才能生效的 runtime 修改，再将相同 patch 临时同步到编译仓并构建。修改 runtime 前，先确认测试环境实际导入的安装验证仓：
 
 ```bash
 python -c "from pathlib import Path; import sys, torch; print(sys.executable); print(Path(torch.__file__).resolve().parent)"
 ```
 
-优先采用仓库支持的源码/构建流程。只有用户明确要求 installed-tree 验证时，才把同一最小 runtime 修改同步到动态解析出的安装目录；文档中的待提交内容仍只记录源码树，安装目录副本单独标为验证用途且绝不 stage。
+优先采用编译仓支持的源码/构建流程。必要时按“代码记录仓 → 编译仓 → 安装验证仓”同步同一最小 runtime patch；每一步都记录基线和命令。文档中的待提交内容只记录代码记录仓源码树，编译仓 build 产物/临时镜像和安装验证仓副本分别标为验证用途且绝不 stage。
 
 推荐做法：
 
@@ -279,11 +284,11 @@ PASSED [108.4338s]
 
 写入或修订工作簿报告前，必须完整阅读 [references/markdown_report.md](references/markdown_report.md)，并以其中的文档契约和可移植模板为准。核心要求：
 
-- 文档开头记录执行环境、实际导入 runtime、仓库/remote/base、dirty changes、仅验证用 installed-tree 副本，以及代码提交和目标分支状态。有代码修改时只保留一张权威逻辑提交表；没有待提交源码也必须明确写出。
+- 文档开头记录编译仓、代码记录仓、安装验证仓三类角色的路径、branch/HEAD、dirty 状态和用途；同时记录实际导入 runtime、remote/base、仅验证用副本，以及代码提交和目标分支状态。有代码修改时只保留一张权威逻辑提交表；没有待提交源码也必须明确写出。
 - case 按工作簿行号排序。每个 case/group 开头写准确 sheet 和行号/范围/列表；参数化分组增加行号到 nodeid 的映射表。
 - 每个 case 严格保留五节且顺序固定：`报错信息`、`测试目的与错误分析`、`解决方法`、`修改后的测试结果`、`提交建议`。
 - `解决方法` 区分已应用源码修改、已应用 test-only 修改、未应用建议、当前基线无 diff、仅诊断。每项已应用修改都提供由 Git 生成的聚焦 unified diff，并解释修改前后行为和因果关系。
-- 源码树 diff 与仅验证用安装目录镜像分开；不得把官方、历史或建议 diff 冒充本地已应用修改。
+- 代码记录仓 diff 是唯一的 applied/submission diff；编译仓同步 patch、build 产物和安装验证仓镜像必须单独列为验证副本，不得把它们或官方、历史、建议 diff 冒充本地已应用修改。
 - `修改后的测试结果` 记录完整命令、结果、相邻覆盖、静态检查、runtime 来源、blocker 和残余风险；基线通过不能写成修复后通过。
 - `提交建议` 与全局表保持同一逻辑分组和顺序，写明 stage/排除的文件或 hunk、提交状态/hash/branch；无代码变化写 `无需提交`。
 - 交付前核对行号顺序、五节完整性、代码围栏、diff/status、验证状态和全局/逐 case 提交编号。
@@ -296,7 +301,7 @@ PASSED [108.4338s]
 
 固定原则：
 
-- 只提交工作仓库中的源码树修改；不 stage 安装目录验证副本或仓库外分析文档。
+- 只提交代码记录仓中的源码树修改；不 stage 编译仓临时 patch/build 产物、安装验证仓副本或仓库外分析文档。若编译仓和代码记录仓是同一路径，仍按代码记录仓的 Git 边界提交。
 - 只有共享同一根因和同一完整修复的 case 才进入一个 commit。互不相关的 runtime、backend、测试预期和基础设施修改必须拆分。
 - 只允许向 `origin` push，且 push 必须由用户明确要求。
 

@@ -164,7 +164,7 @@ python3 optest-case-triage/scripts/backfill_triage_csv.py \
 ## 环境说明
 
 skill 不绑定固定容器、目录、Python 版本或环境脚本。使用时优先采用用户给出的
-工作仓库、工作簿和环境激活命令；没有明确输入时，只在当前目录通过以下特征
+编译仓、代码记录仓、工作簿和环境激活命令；没有明确输入时，只在当前目录通过以下特征
 验证 PyTorch 仓库：
 
 ```text
@@ -174,9 +174,11 @@ test/
 torch/version.py
 ```
 
-运行测试前会记录 `sys.executable`、`torch.__version__` 和 `torch.__file__`。
-如需验证安装包中的 runtime 修改，路径从 `torch.__file__` 动态解析，不假设
-site-packages 布局，且验证副本不能进入源码 commit。完整规则见
+运行测试前会记录编译仓、代码记录仓、安装验证仓，以及 `sys.executable`、
+`torch.__version__` 和 `torch.__file__`。需要编译时，修改从代码记录仓同步到编译仓；
+安装验证仓路径从 `torch.__file__` 动态解析，不假设 site-packages 布局。安装验证仓
+中验证有效的 runtime 修改可以保留用于后续复测，但不能进入代码记录仓源码 commit。
+完整规则见
 [`portable_setup.md`](optest-case-triage/references/portable_setup.md)。
 
 ## 校验
