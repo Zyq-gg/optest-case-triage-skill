@@ -1,6 +1,6 @@
 # 可移植环境准备
 
-每次开始 case 分析都要完整阅读本文。路径和工具必须从当前环境解析，不得假设最初开发 skill 的容器仍然存在。
+每次开始 optest case 或 PyTorch 使用问题分析都要完整阅读本文。路径和工具必须从当前环境解析，不得假设最初开发 skill 的容器仍然存在。
 
 ## 目录
 
@@ -10,7 +10,7 @@
 - [确认 Python 与 PyTorch](#确认-python-与-pytorch)
 - [定位工作簿与输出](#定位工作簿与输出)
 - [映射 Git remote](#映射-git-remote)
-- [处理 runtime 源码验证](#处理-runtime-源码验证)
+- [处理编译与 runtime 源码验证](#处理编译与-runtime-源码验证)
 
 ## 定位 skill 目录
 
@@ -20,11 +20,14 @@
 <skill-dir>/requirements.txt
 <skill-dir>/scripts/find_case_in_xlsx.py
 <skill-dir>/scripts/backfill_triage_csv.py
+<skill-dir>/scripts/collect_pytorch_env.py
 <skill-dir>/references/portable_setup.md
 <skill-dir>/references/official_pytorch_skills.md
 <skill-dir>/references/commit_workflow.md
 <skill-dir>/references/csv_report_backfill.md
 <skill-dir>/references/markdown_report.md
+<skill-dir>/references/problem_triage.md
+<skill-dir>/references/problem_report.md
 ```
 
 不要通过硬编码 clone 路径反推 skill 位置。skill 可能通过符号链接安装、复制到 skills 目录，或直接从 clone 加载。
@@ -52,13 +55,13 @@ test -d test
 test -f torch/version.py
 ```
 
-否则应向用户取得对应 checkout 路径，不能猜测主机专用位置。
+否则不能猜测主机专用位置。Optest/pytest 模式需要源码时应向用户取得对应 checkout；使用问题明确属于配置、环境、用户项目或第三方且无需 PyTorch 源码时，将 PyTorch 编译仓和代码记录仓记为 `未使用/不适用`，不要为了填表阻塞诊断。
 
 以 Git 顶层目录为基准解析仓库内测试路径。接受 `test/dynamo/test_x.py` 和 `dynamo/test_x.py`；后者通常表示命令从 `<repo>/test` 运行。
 
 ## 区分三类仓库
 
-实际任务可能把构建、代码记录和安装验证分开。必须在开始测试前明确三类仓库；它们可以是同一个路径，但不能因为路径相同就省略角色记录。
+实际任务可能把构建、代码记录和安装验证分开。需要检查或修改 PyTorch 源码时，必须在开始测试前明确三类仓库；它们可以是同一个路径，但不能因为路径相同就省略角色记录。一般使用问题不涉及 PyTorch 源码时，允许编译仓和代码记录仓为 `未使用/不适用`，安装验证仓仍由实际 runtime 确认。
 
 | 角色 | 定义 | 允许的修改和用途 | 提交边界 |
 | --- | --- | --- | --- |
@@ -120,7 +123,7 @@ python -m pytest --version
 
 ## 映射 Git remote
 
-`origin`、`upstream`、`official` 是逻辑角色，不保证就是实际 remote 名。fetch 前先检查：
+`origin`、`upstream`、`official` 是 PyTorch 代码记录仓的逻辑角色，不保证就是实际 remote 名。fetch 前先检查：
 
 ```bash
 git -C <repo> remote -v

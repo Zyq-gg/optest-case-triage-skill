@@ -1,6 +1,6 @@
 # 提交工作流
 
-仅当用户明确要求提交已验证的 optest 修复、准备审查分支或推送到 fork 时，才完整阅读并执行本文。
+仅当用户明确要求提交已验证的 optest/pytest case 或 PyTorch 使用问题修复、准备审查分支或推送到 fork 时，才完整阅读并执行本文。
 
 ## 目录
 
@@ -17,6 +17,7 @@
 - 请求分析、修改或验证不代表授权 commit。
 - 请求 commit 不代表授权 push。
 - 请求 push 不代表授权创建 MR/PR，除非用户同时明确要求。
+- 使用问题同时涉及用户项目和 PyTorch 时，两个仓库的 commit/push 授权、remote 和 branch 必须分别确认；不能把一个仓库的授权扩展到另一个仓库。
 - feature branch 绝不能推到 `upstream` 或 `official`；只能推到用户 fork 对应的 `origin`。
 - 未经用户明确要求相应操作，不得 amend、rebase、force-push、删除分支或重写已发布历史。
 
@@ -61,6 +62,8 @@ git checkout -b <dev-branch> <internal-main remote>/<target-branch>
 
 每次提交前列清其 case 行/nodeid、根因、文件和验证证据。Markdown 应使用相同分组，并说明修改处于待提交、已提交还是有意不提交状态。
 
+PyTorch 使用问题还要按仓库拆分：用户项目修改只提交到用户项目仓库，PyTorch 修改只提交到代码记录仓。二者即使共同解决一个问题，也不能组成跨仓库 commit；分别记录 hash 和验证证据。
+
 ## 精确暂存
 
 检查 unstaged diff，只 stage 目标 path 或 hunk。dirty worktree 中避免 `git add -A`、`git add .` 和其他宽泛暂存。
@@ -80,7 +83,7 @@ git diff --cached -- <changed-files>
 
 ## 提交前验证
 
-先完成 case 分析流程要求的验证，再对 staged patch 做轻量仓库检查：
+先完成对应 case/问题分析流程要求的验证，再对 staged patch 做轻量仓库检查：
 
 ```bash
 git diff --cached --check
@@ -142,7 +145,7 @@ git status --short --branch
 git push -u origin <dev-branch>
 ```
 
-不把开发分支推到 `upstream` 或 `official`。除非用户在获知必要性后明确授权，否则不 force-push。
+不把 PyTorch 开发分支推到 `upstream` 或 `official`。用户项目只推到用户明确指定或经检查确认的 fork remote。除非用户在获知必要性后明确授权，否则不 force-push。
 
 交付时报告：
 

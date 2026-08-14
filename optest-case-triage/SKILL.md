@@ -1,18 +1,19 @@
 ---
 name: optest-case-triage
-description: "用于逐项分析 PyTorch optest Excel 行或 pytest nodeid，以及在分析完成后依据权威 Markdown 报告安全回填 CSV 的测试目的、解决方案、最终状态和遗留原因。覆盖复现、官方与上游修复检索、根因分析、最小修改、验证、结构化文档；仅在用户明确要求时提交或推送。"
+description: "用于分析 PyTorch optest/pytest case 或实际使用中遇到的问题，也可在分析完成后依据权威 Markdown 安全回填 CSV。接受 Excel 行、pytest nodeid、问题描述、日志、脚本、命令、模型运行现象或问题现场连接方式；覆盖环境采集、复现、归属判断、官方与上游检索、根因分析、最小修改、分层验证和结构化文档，仅在用户明确要求时提交或推送。"
 ---
 
-# Optest Case 分析
+# PyTorch Optest 与问题分析
 
 ## 概述
 
-本 skill 有两个相互独立的工作模式：
+本 skill 有三个相互独立的工作模式：
 
-1. 单 case 深度分析：从工作簿的一行或 pytest nodeid 出发，完成复现、诊断、修改、验证和 Markdown 记录。
-2. 分析后文档处理：以已经完成的 Markdown 报告为权威来源，安全回填用户 CSV 中的四个汇总字段。
+1. **Optest/pytest case 分析**：从工作簿的一行或 pytest nodeid 出发，完成复现、诊断、修改、验证和工作簿 Markdown 记录。
+2. **PyTorch 使用问题分析**：从问题描述、日志、脚本、命令、运行现象或问题现场出发，建立问题身份、复现、判断归属、修复、验证并生成独立问题报告。
+3. **分析后 CSV 回填**：以已经完成的工作簿 Markdown 报告为权威来源，安全回填用户 CSV 中的四个汇总字段。
 
-不要把 CSV 回填与 case 复现、代码修改混在同一个流程中。
+先按输入自动选择模式。不要把 CSV 回填与 case/问题复现、代码修改混在同一个流程中；不要给一般使用问题强加工作簿行号或 pytest 结构。
 
 适用请求包括：
 
@@ -22,6 +23,8 @@ description: "用于逐项分析 PyTorch optest Excel 行或 pytest nodeid，以
 - 检索 PyTorch 官方或内部上游是否已有修复；
 - 尝试最小化源码或测试修改并验证；
 - 生成或完善逐 case 的 Markdown 分析文档；
+- 分析使用 PyTorch 时的异常、hang、数值、性能、内存、安装、编译、backend、distributed 或第三方扩展问题；
+- 在当前环境或用户提供的远程问题现场复现，也可基于日志完成明确标记的静态诊断；
 - 依据现有 Markdown 和任意辅助 CSV 列回填 `测试目的`、`解决方案`、`最终状态`、`遗留原因`；
 - 在用户明确要求后，将已验证修复拆成可审查的提交并推送到用户 fork。
 
@@ -31,6 +34,7 @@ description: "用于逐项分析 PyTorch optest Excel 行或 pytest nodeid，以
 
 - optest Excel 工作簿，以及 op 名或 `(py name, class, op name)`；
 - 不涉及工作簿时，可直接提供 pytest nodeid；
+- PyTorch 问题描述，以及可选的日志、复现命令、脚本、用户项目、预期行为或问题现场连接方式；
 - 文档回填模式下，提供已完成的 Markdown 报告和待汇总 CSV。
 
 典型输出：
@@ -41,14 +45,15 @@ description: "用于逐项分析 PyTorch optest Excel 行或 pytest nodeid，以
 - 尝试或应用的本地修改；
 - 验证结果与残余风险；
 - 按工作簿行号排列、包含统一文档头和五节 case 记录的累计 Markdown 报告；
+- 或包含问题身份、现场、归属、四类仓库、五节分析、验证和提交边界的 PyTorch 使用问题报告；
 - 或在独立文档模式下，四个汇总字段来自 Markdown、其余字段保持不变且结构验证通过的 CSV。
 
 ## 可移植性和环境规则
 
-每次进行单 case 分析，首先完整阅读 [references/portable_setup.md](references/portable_setup.md)。
+每次进行 optest case 或 PyTorch 使用问题分析，首先完整阅读 [references/portable_setup.md](references/portable_setup.md)。
 
 - `<skill-dir>` 表示本 `SKILL.md` 所在目录；脚本、依赖声明和参考文档都从该目录解析。
-- 使用用户指定的编译仓、代码记录仓、Python 环境、工作簿和输出路径。每次分析都明确区分编译仓、代码记录仓和安装验证仓；三者相同时仍分别记录角色。只有验证后才能采用当前目录或当前环境，不猜测固定主机路径和激活脚本。详细规则见 [references/portable_setup.md](references/portable_setup.md)。
+- 使用用户指定的问题现场/用户项目、编译仓、代码记录仓、Python 环境、工作簿和输出路径。需要 PyTorch 源码时明确区分编译仓、代码记录仓和安装验证仓；三者相同时仍分别记录角色。不涉及源码时允许编译仓和代码记录仓为 `未使用/不适用`。只有验证后才能采用当前目录或当前环境，不猜测固定主机路径和激活脚本。详细规则见 [references/portable_setup.md](references/portable_setup.md)。
 - 将 `origin`、`upstream`、`official` 视为逻辑角色，按 URL 或用户说明映射；只 fetch 已配置 remote，缺少可选参考 remote 时继续完成可执行的本地分析。
 - fork 开发分支（例如 `2.9.1-dev-xxx`）通常对应内部基线 `2.9.1-dev`；除非用户另有指定。内部版本再映射到官方发布线（例如 `release/2.9`）判断覆盖情况。
 - 官方检索顺序是 `main`、较新的 release、目标 release。没有本地 official remote 时，使用本 skill 的官方技能指引和实时 GitHub 链接。
@@ -63,6 +68,8 @@ description: "用于逐项分析 PyTorch optest Excel 行或 pytest nodeid，以
 - 定位工作簿行，处理包含匹配和歧义候选；
 - 读取 `错误结果`、`详细分析`、`测试目的`、`历史版本分析`、`新增标记` 等有效列；
 - 在正确环境和工作仓库中复现失败；
+- 从问题描述、日志或现场建立可追溯的问题身份，并尽量自动发现环境信息；
+- 判断问题属于使用/配置、环境安装、用户项目、第三方扩展、PyTorch runtime/compiler/backend、数值、性能、内存、distributed 还是数据/模型；
 - 将现象归类为仍可复现、已修复、flaky、仅环境相关或日志不匹配；
 - 检查本地源码、测试以及 `upstream/*`、`official/*` 的历史；
 - 在需要且网络可用时检索官方 PyTorch issue、PR、tag 和源码；
@@ -80,11 +87,30 @@ description: "用于逐项分析 PyTorch optest Excel 行或 pytest nodeid，以
 - 不用大范围 skip、全局放宽容差或无关重构换取测试通过。
 - 工作簿记录只是假设来源，不是结论证据。
 - 不覆盖用户已有修改；dirty worktree 必须先检查并与现有改动共存。
+- 用户项目/问题现场与 PyTorch 代码记录仓是不同边界；未经用户要求，不修改用户项目。需要修改时单独生成 diff、验证和提交。
+- 运行用户脚本前做与风险匹配的轻量检查；不因安全检查制造繁琐流程，但不得静默执行下载、安装、提权、危险反序列化、破坏性写入或超大长时任务。
 - 在改变测试语义或设计本地 workaround 前，优先检查官方 `main`、release、commit、PR 和 issue。
 - 选择最小且有证据的补丁；移植测试预期时必须解释语义为何成立。
 - CSV 回填不得硬编码辅助列字母（例如 L）；按表头和内容发现列，冲突时以当前 Markdown 为准。
 
-## 单 case 分析流程
+## 模式路由
+
+按最强输入信号自动选择，不要求用户手工选择：
+
+```text
+XLSX 行、sheet/op 身份或 pytest nodeid
+    → Optest/pytest case 分析
+
+问题描述、日志、命令、脚本、模型运行现象或问题现场
+    → PyTorch 使用问题分析
+
+已完成工作簿 Markdown + 待回填 CSV
+    → CSV 回填
+```
+
+输入同时包含 pytest 和用户工作负载时，以用户目标为准：用户要处理工作簿行则走 case 模式；用户要解决真实工作负载则走使用问题模式，并把 pytest 作为 regression 证据。
+
+## 模式一：Optest/pytest case 分析
 
 ### 1. 读取工作簿行
 
@@ -305,7 +331,32 @@ PASSED [108.4338s]
 - 只有共享同一根因和同一完整修复的 case 才进入一个 commit。互不相关的 runtime、backend、测试预期和基础设施修改必须拆分。
 - 只允许向 `origin` push，且 push 必须由用户明确要求。
 
-## 独立文档流程：由 Markdown 回填 CSV
+## 模式二：PyTorch 使用问题分析
+
+输入是问题描述、日志、脚本、命令、模型运行现象或问题现场时，完整阅读 [references/problem_triage.md](references/problem_triage.md)，按其中路线完成：
+
+1. 从已有材料自动建立问题身份，不要求用户先填写固定表单；预期行为是可选输入，缺失时可依据可信 contract 推断并标记。
+2. 优先在用户提供的直接环境复现；用户给出连接方式时进入问题现场；只有日志时做明确标记的静态诊断。
+3. 记录用户项目/问题现场，并按需记录 PyTorch 编译仓、代码记录仓和安装验证仓；PyTorch 源码不涉及时允许写 `未使用/不适用`。
+4. 对下载、安装、危险反序列化、破坏性写入和超大长时任务做轻量安全检查；普通只读复现直接推进。
+5. 复现并保持错误签名或稳定现象，自动判断问题属于使用/配置、环境、用户项目、第三方、PyTorch runtime/compiler/backend、数值、性能、内存、distributed 还是数据/模型。
+6. 按领域路由并优先检索官方/版本历史，再自动选择配置、项目、安装、第三方、PyTorch、unsupported、workaround 或仅诊断方案；只有重大语义/权限取舍才让用户选择。
+7. 分层验证原始/等价复现的预期行为；PyTorch 源码修复再运行 regression 和相邻测试。错误消失但语义未验证不算完整修复。
+
+用户项目与 PyTorch 代码记录仓属于独立修改和提交边界。所有 PyTorch applied diff 来自代码记录仓；需要时同步到编译仓和安装验证仓。安装验证仓中验证有效的修改默认保留供用户复测，但不 stage/commit。
+
+创建报告前完整阅读 [references/problem_report.md](references/problem_report.md)。一般问题报告不使用工作簿行号，固定包含：`问题现象与报错信息`、`预期行为与错误分析`、`解决方法`、`验证结果`、`提交建议`。默认写到用户指定路径、日志旁或当前任务目录的 `pytorch_problem_<short-name>.md`。
+
+环境信息可安全采集：
+
+```bash
+python3 <skill-dir>/scripts/collect_pytorch_env.py
+python3 <skill-dir>/scripts/collect_pytorch_env.py --json
+```
+
+只有用户明确要求 commit、push 或 MR/PR 时才读取 `commit_workflow.md`。同时修改用户项目和 PyTorch 时，分别提交、分别验证，不创建跨仓库 commit。
+
+## 模式三：由 Markdown 回填 CSV
 
 这是分析完成后的独立文档任务，不是单 case 流程的第 9 步。仅当 Markdown 已完成且用户要求更新 CSV 汇总字段时使用。
 
@@ -321,6 +372,8 @@ PASSED [108.4338s]
 先形成语义 update plan，再运行 `scripts/backfill_triage_csv.py`。该 helper 不解释 Markdown，只负责防止把正确分析写错行或改写无关 CSV 数据。
 
 ## 辅助脚本
+
+`scripts/collect_pytorch_env.py` 安全读取 Python、PyTorch、设备和实际安装验证仓信息，不收集完整环境变量或凭据。它用于使用问题模式，也可辅助 optest 环境记录。
 
 `scripts/find_case_in_xlsx.py` 用于定位工作簿行，并输出匹配行的所有非空列：
 
@@ -358,6 +411,10 @@ python3 <skill-dir>/scripts/backfill_triage_csv.py \
 分析全部完成后，若用户需要把 Markdown 结论汇总到四个 CSV 字段，再使用本 skill 的独立 CSV 回填流程；它消费已有分析，不替代批量失败提取或逐 case 验证。
 
 ## 典型判断示例
+
+### 实际使用问题
+
+用户报告 `torch.compile` 模型 crash 时，先在问题现场保留原始模式复现，对照 eager/compiled 并路由 PT2；若根因是项目中不受支持的动态 Python 行为，优先调整用户项目或明确 graph break，不强行修改 PyTorch。若确认是 Inductor 缺陷，才在代码记录仓修复、按需同步编译仓和安装验证仓，并同时验证用户复现与 PyTorch regression test。
 
 ### Timing 测试
 

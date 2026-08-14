@@ -1,6 +1,6 @@
 # 官方 PyTorch skill 路由
 
-复现 case 后、深入诊断前使用本文。只加载与失败匹配的官方 skill，不要把全部官方 skill 填入上下文，也不要继承其中修改 GitHub 状态的动作。
+复现 optest case 或 PyTorch 使用问题后、深入诊断前使用本文。只加载与失败匹配的官方 skill，不要把全部官方 skill 填入上下文，也不要继承其中修改 GitHub 状态的动作。
 
 ## 目录
 
@@ -26,9 +26,9 @@ checked: 2026-07-13
 本文包含 clone 本 skill 后可离线使用的路由和核心指导，不强制要求 official remote。已经配置时，按 `portable_setup.md` 映射逻辑角色并刷新匹配来源：
 
 ```bash
-git -C <working PyTorch repo> fetch <official remote> main --prune
-git -C <working PyTorch repo> rev-parse <official remote>/main
-git -C <working PyTorch repo> show <official remote>/main:.claude/skills/<skill>/SKILL.md
+git -C <code-record-repo> fetch <official remote> main --prune
+git -C <code-record-repo> rev-parse <official remote>/main
+git -C <code-record-repo> show <official remote>/main:.claude/skills/<skill>/SKILL.md
 ```
 
 没有该 remote 但能联网时，使用实时或固定版本链接。两者都不可用时，使用本文继续分析。若刷新后的官方指导实质影响了诊断，Markdown 中记录解析到的官方 commit。
@@ -39,7 +39,7 @@ git -C <working PyTorch repo> show <official remote>/main:.claude/skills/<skill>
 2. 本 skill 的 worktree、验证、文档、commit 和 push 规则；
 3. 相关官方 skill 的领域诊断指导。
 
-官方 issue-triage skill 可能执行 label、comment、transfer 或 close issue。这些不属于 optest case 分析；除非用户明确要求，否则一律禁止。
+官方 issue-triage skill 可能执行 label、comment、transfer 或 close issue。这些不属于本 skill 的本地问题分析；除非用户明确要求，否则一律禁止。
 
 ## 集成矩阵
 
@@ -63,6 +63,21 @@ git -C <working PyTorch repo> show <official remote>/main:.claude/skills/<skill>
 | `skill-writer` | 核心外 | 用于编写 Claude skill，不负责 PyTorch case 诊断。 |
 
 ## 高价值诊断路线
+
+### 实际使用问题的基础路由
+
+使用问题先按真实修复位置分类，再进入专项 skill：
+
+- import、wheel、ABI、共享库和 extension 加载失败：先确认 Python/torch 路径、构建配置、依赖与 driver/runtime 兼容性；
+- API 或配置问题：核对官方 contract、输入约束和生命周期，不因调用方式错误修改 PyTorch；
+- eager/operator/autograd/dispatcher：沿用户入口、Python binding、dispatcher、ATen kernel 和 backward 路径定位；
+- correctness/numerical：建立 eager/reference/compiled 或跨 backend 对照，验证输出、梯度、dtype、shape 和 alias contract；
+- performance：同环境预热、同步、多轮统计，再检查 profiler、生成代码和 regression 区间；
+- memory：区分 allocator cache、reserved/allocated、峰值、生命周期和真实泄漏；
+- serialization/checkpoint：先检查文件完整性、格式、版本和安全加载，再判断 runtime 兼容缺陷；
+- 用户项目或第三方扩展：与 PyTorch 代码记录仓分开，不把外部修复写成 PyTorch patch。
+
+确认是 PT2、AOTI、distributed 或 CUDA index width 问题后，再加载下列对应路线。没有匹配官方 skill 时，仍使用 `problem_triage.md` 的归属、官方检索和验证规则。
 
 ### PT2 compiler 失败
 

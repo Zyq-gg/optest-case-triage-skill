@@ -1,4 +1,4 @@
 interface:
-  display_name: "Optest Case 分析"
-  short_description: "逐项分析 PyTorch optest case，并安全回填 CSV 报告。"
-  default_prompt: "使用 $optest-case-triage 分析并记录这个 PyTorch optest case，或依据权威 Markdown 安全回填 CSV 汇总列。"
+  display_name: "PyTorch Optest 与问题分析"
+  short_description: "分析 PyTorch optest case 与实际使用问题。"
+  default_prompt: "使用 $optest-case-triage 分析这个 PyTorch optest case 或实际使用问题，完成复现、诊断、验证和结构化记录。"
