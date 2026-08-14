@@ -91,6 +91,8 @@ description: "用于分析 PyTorch optest/pytest case 或实际使用中遇到�
 - 运行用户脚本前做与风险匹配的轻量检查；不因安全检查制造繁琐流程，但不得静默执行下载、安装、提权、危险反序列化、破坏性写入或超大长时任务。
 - 在改变测试语义或设计本地 workaround 前，优先检查官方 `main`、release、commit、PR 和 issue。
 - 选择最小且有证据的补丁；移植测试预期时必须解释语义为何成立。
+- 当前环境因 guard、fallback、skip、禁用优化或 workaround 而通过时，区分历史原始失败、当前遏制状态和目标修复状态；不能把路径未执行写成根因已修复。
+- compiler/autotune/dispatch 等候选路径敏感问题必须证明目标路径真实注册并执行；要求保留性能时同时验证正确性、fallback、自然选择和同环境性能。
 - CSV 回填不得硬编码辅助列字母（例如 L）；按表头和内容发现列，冲突时以当前 Markdown 为准。
 
 ## 模式路由
@@ -221,7 +223,12 @@ git -C <code-record-repo> branch -r --contains COMMIT
 git -C <code-record-repo> merge-base --is-ancestor COMMIT official/main
 git -C <code-record-repo> merge-base --is-ancestor COMMIT official/release/NEWER_2.X
 git -C <code-record-repo> merge-base --is-ancestor COMMIT upstream/BASE_BRANCH
+git -C <code-record-repo> rev-list --left-right --count upstream/BASE_BRANCH...COMMIT
+git -C <code-record-repo> diff --stat upstream/BASE_BRANCH..COMMIT
+git -C <code-record-repo> diff COMMIT^..COMMIT -- PY_NAME
 ```
+
+候选提交的逻辑可复用不代表其旧分支可直接合并；分支落后、分叉或含无关差异时，从当前目标基线重新应用聚焦 hunk。
 
 需要联网检索时，以官方 PyTorch 来源为先：
 
@@ -288,6 +295,8 @@ python -c "from pathlib import Path; import sys, torch; print(sys.executable); p
 
 用同一环境重跑精确失败 case。共享逻辑发生变化时，至少再跑一个相邻变体或窄范围 `-k` 集合。非简单 runtime 或测试框架修改还应执行 [references/official_pytorch_skills.md](references/official_pytorch_skills.md) 路由出的测试、兼容性和设计检查。
 
+候选路径敏感问题不能只依赖自然 dispatch 的 PASS：强制或观测目标 candidate，验证不支持输入不会注册危险路径，并确认 base/fallback 仍可用。正确性修复同时承诺保留性能时，再用同环境 baseline、自然选择和同步重复测量证明没有通过撤掉优化规避。
+
 记录精确命令和摘要，例如：
 
 ```text
@@ -339,9 +348,9 @@ PASSED [108.4338s]
 2. 优先在用户提供的直接环境复现；用户给出连接方式时进入问题现场；只有日志时做明确标记的静态诊断。
 3. 记录用户项目/问题现场，并按需记录 PyTorch 编译仓、代码记录仓和安装验证仓；PyTorch 源码不涉及时允许写 `未使用/不适用`。
 4. 对下载、安装、危险反序列化、破坏性写入和超大长时任务做轻量安全检查；普通只读复现直接推进。
-5. 复现并保持错误签名或稳定现象，自动判断问题属于使用/配置、环境、用户项目、第三方、PyTorch runtime/compiler/backend、数值、性能、内存、distributed 还是数据/模型。
+5. 复现并保持错误签名或稳定现象，区分历史原始失败、当前遏制状态和目标修复状态；自动判断问题属于使用/配置、环境、用户项目、第三方、PyTorch runtime/compiler/backend、数值、性能、内存、distributed 还是数据/模型。
 6. 按领域路由并优先检索官方/版本历史，再自动选择配置、项目、安装、第三方、PyTorch、unsupported、workaround 或仅诊断方案；只有重大语义/权限取舍才让用户选择。
-7. 分层验证原始/等价复现的预期行为；PyTorch 源码修复再运行 regression 和相邻测试。错误消失但语义未验证不算完整修复。
+7. 分层验证原始/等价复现的预期行为；PyTorch 源码修复再运行 regression 和相邻测试。候选路径敏感问题补充目标路径、非法适用域、fallback 和自然选择证据；性能目标补充同环境对照。错误消失但语义未验证不算完整修复。
 
 用户项目与 PyTorch 代码记录仓属于独立修改和提交边界。所有 PyTorch applied diff 来自代码记录仓；需要时同步到编译仓和安装验证仓。安装验证仓中验证有效的修改默认保留供用户复测，但不 stage/commit。
 
@@ -374,6 +383,8 @@ python3 <skill-dir>/scripts/collect_pytorch_env.py --json
 ## 辅助脚本
 
 `scripts/collect_pytorch_env.py` 安全读取 Python、PyTorch、设备和实际安装验证仓信息，不收集完整环境变量或凭据。它用于使用问题模式，也可辅助 optest 环境记录。
+
+`scripts/verify_runtime_sync.py` 只读比较代码记录仓源码文件与安装验证仓镜像的大小和 SHA256；退出码 `0/1/2` 分别表示一致、不一致、读取失败。用它证明安装环境验证的是同一份 runtime patch，不能用它替代构建产物逻辑等价分析。
 
 `scripts/find_case_in_xlsx.py` 用于定位工作簿行，并输出匹配行的所有非空列：
 
@@ -414,7 +425,7 @@ python3 <skill-dir>/scripts/backfill_triage_csv.py \
 
 ### 实际使用问题
 
-用户报告 `torch.compile` 模型 crash 时，先在问题现场保留原始模式复现，对照 eager/compiled 并路由 PT2；若根因是项目中不受支持的动态 Python 行为，优先调整用户项目或明确 graph break，不强行修改 PyTorch。若确认是 Inductor 缺陷，才在代码记录仓修复、按需同步编译仓和安装验证仓，并同时验证用户复现与 PyTorch regression test。
+用户报告 `torch.compile` 模型 crash 时，先在问题现场保留原始模式复现，对照 eager/compiled 并路由 PT2；若根因是项目中不受支持的动态 Python 行为，优先调整用户项目或明确 graph break，不强行修改 PyTorch。若确认是 Inductor 缺陷，才在代码记录仓修复、按需同步编译仓和安装验证仓，并同时验证用户复现与 PyTorch regression test。涉及 autotune/template 优化时，强制目标 candidate 验证其正确性，用不满足适用域的输入验证 guard，检查普通 fallback 保留，再运行自然 autotune 和同环境性能对照；当前版本若仅因删除 candidate 而通过，应标为优化回退后的遏制状态。
 
 ### Timing 测试
 

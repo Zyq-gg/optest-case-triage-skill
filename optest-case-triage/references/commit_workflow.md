@@ -47,6 +47,8 @@ git ls-remote --heads <user-fork remote> <dev-branch>
 git checkout -b <dev-branch> <internal-main remote>/<target-branch>
 ```
 
+若原代码记录工作区 dirty 且无法安全切分支，按 `portable_setup.md` 创建本问题 linked worktree，并在该 worktree 中执行后续 stage/commit/push；不要为切分支自动 stash、清理或覆盖用户修改。交付时同时说明原工作区保持未动和实际提交 worktree/branch。
+
 开发分支已经存在于本地或用户 fork 时，先检查内容；复用、删除或强制更新前必须询问用户。
 
 ## 按逻辑修复拆分提交

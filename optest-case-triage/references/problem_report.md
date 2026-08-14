@@ -19,6 +19,7 @@
 - 问题来自 issue、工单或用户编号时，将该编号作为稳定身份；否则用清晰标题、入口命令和错误签名建立身份。
 - 增量更新同一问题报告，保留正确历史；新验证改变结论时，更新状态并说明旧结论为何过时。
 - 明确区分直接复现、等价/最小复现和仅日志静态分析。
+- 问题涉及 guard、fallback、skip、禁用优化或 workaround 时，分别记录历史原始失败、当前遏制状态和目标修复状态；不能用当前不报错覆盖历史语义。
 
 ## 文档头
 
@@ -56,6 +57,7 @@
 - 当前代码提交状态和目标分支；
 - 编译仓与安装验证仓是否同步了相同 patch；
 - 安装验证仓中哪些有效修改被保留给用户复测。
+- 安装验证仓修改前后的文件 hash，以及与代码记录仓 runtime 文件的一致性检查结果。
 
 存在 PyTorch 修改时，文档顶部使用一张权威逻辑修改表：
 
@@ -80,6 +82,7 @@
 - 错误签名或 hang/性能/内存/数值度量；
 - 当前现象是否与原问题一致；
 - warning 与真正失败条件的区别。
+- 历史原始失败、当前 guard/fallback/workaround 状态和目标修复状态；不适用时明确写不适用。
 
 只有日志时写 `仅日志分析，未在当前环境复现`。不能将错误消失直接等同于功能正确。
 
@@ -94,6 +97,7 @@
 - 使用/API、环境、用户项目、第三方、PyTorch、backend 等候选如何排除；
 - 官方 `main`、release、issue、PR、commit 结论，再写内部 upstream；
 - 最终根因和残余不确定性。
+- 候选路径敏感问题的 eligibility、外层 guard、实际注册/生成/执行路径，以及当前通过是否被其他 candidate 或 fallback 掩盖。
 
 性能和内存问题必须说明 baseline 与测量方法；数值问题说明 reference；hang 说明阻塞层和 timeout 证据。
 
@@ -122,6 +126,7 @@
 - 修改前后行为和与根因的因果关系；
 - 影响和不影响的 device/dtype/shape/backend/API；
 - 采用、适配或不采用官方方案的理由。
+- 如果现状靠禁用路径或删除优化遏制问题，说明目标方案如何恢复原语义/性能，而不是把遏制措施冒充根因修复。
 
 配置、环境和用户项目解决方案不能标为 PyTorch 源码修复。未应用 diff 必须显式标记，不能在下一节称为修复后验证。
 
@@ -137,6 +142,8 @@
 - 静态检查；
 - 未运行范围、blocker 和残余风险；
 - 安装验证仓保留修改的路径和当前状态。
+- candidate/dispatch/autotune 问题的路径证据：强制候选、生成代码、counter、日志或 profiler；自然通过不能替代该证据。
+- 性能敏感正确性修复的 base/优化对照、非法适用域、fallback、自然选择、首次编译/资源淘汰和运行性能结果。
 
 结果使用准确状态：`已修复并验证`、`配置后通过`、`环境修复后通过`、`workaround 后通过`、`仍失败`、`无法复现`、`无法验证`、`明确不支持`。skip/xfail 不能写成真实 PASS。
 
@@ -161,6 +168,8 @@
 - 用户项目 diff 单独生成、单独验证、单独提交。
 - 基线通过不能写成修复后通过；只验证 workaround 不能宣称根因已修复。
 - 无异常不等于输出正确；按问题类型验证语义、数值、性能、内存或分布式完成条件。
+- 强制目标 candidate 未实际进入时，不能把结果写成该 candidate 已验证；先检查 eligibility、外层 guard 和缓存。
+- 要求保留性能优化时，删除候选、广泛 fallback 或硬编码失败 shape 只能标为 workaround，不能标为完整修复。
 
 ## 提交边界
 
@@ -184,6 +193,7 @@
 8. 验证覆盖预期行为，不只检查异常消失。
 9. 安装验证仓保留 patch 已记录，但未进入提交建议。
 10. 命令、代码围栏、表格、链接、hash、branch 和状态一致。
+11. 历史失败、当前遏制和目标修复没有混写；候选路径与性能保留证据符合问题目标。
 
 ## 可移植模板
 
@@ -197,6 +207,7 @@
 用户项目/入口: <path or command>
 预期行为: <用户提供 / contract / 推断 / 未确认>
 实际行为: <error signature or measured symptom>
+历史/当前/目标状态: <original failure / containment / repaired target>
 ```
 
 运行环境：
@@ -221,9 +232,13 @@ python3 <skill-dir>/scripts/collect_pytorch_env.py
 
 <description, original log, reproduction level and exact command/result>
 
+<historical failure, current containment and target-fix state when relevant>
+
 ### 2. 预期行为与错误分析
 
 <expected contract, inputs, call path, ownership, evidence, official/internal findings>
+
+<candidate eligibility and actual execution-path evidence when relevant>
 
 ### 3. 解决方法
 
@@ -242,6 +257,8 @@ python3 <skill-dir>/scripts/collect_pytorch_env.py
 ```
 
 <regression scope, runtime source, retained validation patch, residual risk>
+
+<forced candidate, invalid-domain guard, fallback, natural selection and performance evidence when relevant>
 
 ### 5. 提交建议
 

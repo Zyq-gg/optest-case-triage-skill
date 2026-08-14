@@ -96,6 +96,14 @@ python3 <skill-dir>/scripts/collect_pytorch_env.py --json
 3. **最小复现**：独立脚本保留定义问题的 backend、dtype、shape、dynamic/distributed 条件。
 4. **未复现**：当前环境不具备条件，只能静态诊断。
 
+先区分三个可能不同的状态，不能只记录“当前是否报错”：
+
+1. **历史原始失败**：引入问题的版本、配置和失败签名；
+2. **当前遏制状态**：当前环境是否因删除优化、guard、fallback、skip、配置变化或 workaround 而不再失败；
+3. **目标修复状态**：根因修复后，原始语义、支持范围和性能目标是否同时恢复。
+
+当前基线通过但目标路径已被禁用时，状态应写成 `workaround/优化回退后通过` 或 `当前无法直接复现历史路径`，不能写成根因已修复。能够安全运行历史版本时使用隔离 checkout/linked worktree；不能运行时使用固定 commit 源码、生成代码、公式枚举或历史日志建立明确标记的静态证据。不要为了重建历史失败而覆盖唯一可用的安装环境或用户 dirty 工作区。
+
 每次复现记录：
 
 - 激活命令、工作目录和完整执行命令；
@@ -115,6 +123,15 @@ python3 <skill-dir>/scripts/collect_pytorch_env.py --json
 - hang：使用有限 timeout 和进程/线程/collective 状态，避免无限等待。
 
 最小化每一步都重新核对错误签名。不能删除定义问题的 backend、dtype、shape、dynamic、distributed 或第三方集成条件。
+
+对 compiler、dispatcher、autotune、kernel registry、backend fallback 等“候选路径敏感”问题，再记录：
+
+- 输入是否真实满足 candidate 的 eligibility/guard，不凭 shape 名称推断；
+- 目标 candidate 是否注册、生成并实际执行；
+- 当前通过是否来自另一个 candidate、ATen fallback、缓存命中或目标路径被过滤；
+- warning、资源不足导致的单候选淘汰与最终功能失败之间的区别。
+
+优先用强制候选配置、生成代码、日志、mock/counter 或 profiler 提供路径证据。只运行自然选择并看到输出正确，不能证明目标优化本身正确。
 
 ## 判断问题归属
 
@@ -169,6 +186,17 @@ python3 <skill-dir>/scripts/collect_pytorch_env.py --json
 
 依次检查 official `main`、较新 release、目标 release/tag、官方 issue/PR/commit，再检查内部较新 upstream 和目标基线。记录精确修复、相关方向或未找到。需要当前信息时进行网络检索；使用官方 PyTorch 和相关依赖的权威来源。
 
+发现历史候选 commit 或旧修复分支时，分别审查“提交逻辑”和“分支可合并性”：
+
+```bash
+git -C <code-record-repo> merge-base <target-base> <candidate>
+git -C <code-record-repo> rev-list --left-right --count <target-base>...<candidate>
+git -C <code-record-repo> diff --stat <target-base>..<candidate>
+git -C <code-record-repo> diff <candidate>^..<candidate> -- <target-files>
+```
+
+旧提交中的 hunk 可以作为设计证据，不代表旧分支适合直接提交 MR。候选分支落后、分叉或夹带无关差异时，从当前目标基线重新应用最小逻辑修改，不把整条历史带入提交。
+
 ## 自动选择解决方案
 
 根据归属自动选择最小方案，尽量不让用户做技术分类选择：
@@ -206,6 +234,19 @@ PyTorch 源码修改遵守：
 3. PyTorch 源码修改运行相关已有 pytest；现有测试不能长期覆盖时才新增 regression test；
 4. 修改共享逻辑时运行相邻 dtype/device/shape/backend 变体；
 5. 记录未运行范围和残余风险。
+
+候选路径敏感且同时要求保留性能优化时，增加以下联合验收：
+
+| 检查 | 证明内容 |
+| --- | --- |
+| reference/eager 对照并强制目标 candidate | 优化实现本身正确，没有被其他 backend 掩盖。 |
+| 非法适用域输入 | 危险 candidate 不注册，并走明确的安全路径。 |
+| base/fallback candidate 检查 | 修复没有删除必要的正确性或性能 fallback。 |
+| 自然 autotune/dispatch | 合法场景下优化仍能参与并可能胜出。 |
+| 同环境性能对照 | 没有用撤掉优化换正确性；记录预热、同步、重复方法。 |
+| 编译与资源日志 | 候选数、首次编译开销、单候选 OOR/淘汰与最终结果可区分。 |
+
+测试若得到 `NoValidChoices`、目标 counter 为零或生成代码中没有目标 kernel，先重新核对 eligibility 和外层 guard，再判断是生产缺陷还是测试假设错误。
 
 专项成功条件：
 

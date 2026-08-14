@@ -7,6 +7,7 @@
 - [定位 skill 目录](#定位-skill-目录)
 - [定位工作仓库](#定位工作仓库)
 - [区分三类仓库](#区分三类仓库)
+- [保护 dirty 工作区并使用 linked worktree](#保护-dirty-工作区并使用-linked-worktree)
 - [确认 Python 与 PyTorch](#确认-python-与-pytorch)
 - [定位工作簿与输出](#定位工作簿与输出)
 - [映射 Git remote](#映射-git-remote)
@@ -21,6 +22,7 @@
 <skill-dir>/scripts/find_case_in_xlsx.py
 <skill-dir>/scripts/backfill_triage_csv.py
 <skill-dir>/scripts/collect_pytorch_env.py
+<skill-dir>/scripts/verify_runtime_sync.py
 <skill-dir>/references/portable_setup.md
 <skill-dir>/references/official_pytorch_skills.md
 <skill-dir>/references/commit_workflow.md
@@ -99,6 +101,28 @@ git -C <code-record-repo> status --short --branch
 git -C <code-record-repo> rev-parse HEAD
 ```
 
+## 保护 dirty 工作区并使用 linked worktree
+
+代码记录仓存在用户未提交修改，且切换目标分支可能覆盖、冲突或混入其他任务时，不要 stash、清理或强行 checkout。先确认已有 worktree、目标基线和开发分支是否存在：
+
+```bash
+git -C <code-record-repo> status --short --branch
+git -C <code-record-repo> worktree list --porcelain
+git -C <code-record-repo> rev-parse <internal-remote>/<target-branch>
+git -C <code-record-repo> branch --list <dev-branch>
+```
+
+开发分支和目标路径均未占用时，可从精确基线创建 linked worktree：
+
+```bash
+git -C <code-record-repo> worktree add \
+  -b <dev-branch> \
+  <linked-worktree-path> \
+  <internal-remote>/<target-branch>
+```
+
+linked worktree 与原路径共享同一个 Git object/ref 仓库，但有独立 checkout 和工作树。将它记录为“本问题代码记录 worktree”，同时记录原代码记录工作区及其 dirty 文件保持未动。后续 diff、stage、commit、push 都从本问题 worktree 执行；不能把新路径误写成另一个无关 clone。分支或路径已存在时先检查并复用安全的现有 worktree，不删除、强制重建或重置。
+
 ## 确认 Python 与 PyTorch
 
 使用用户提供的环境激活命令。若未提供，保留并记录当前 shell 环境，不 source 猜测的脚本。
@@ -153,3 +177,15 @@ python -c "from pathlib import Path; import torch; print(Path(torch.__file__).re
 ```
 
 只同步同一份最小 runtime diff：代码记录仓 → 编译仓（如需构建）→ 安装验证仓（如需安装包验证）。分别记录每个副本的文件、基线和命令。安装验证仓中经验证有效的修改默认不回退，保留给用户后续复测；如果用户要求清理或切换版本，必须先记录当前副本状态再操作。绝不 stage 或 commit 编译产物、安装验证仓或工作仓库之外的文件。不得硬编码安装前缀、Python 版本或包管理器布局。
+
+修改安装验证仓前，记录目标文件路径、原始 hash 和来源版本；同步后对每个 runtime 文件做字节一致性检查：
+
+```bash
+sha256sum <installed-runtime-file>
+
+python3 <skill-dir>/scripts/verify_runtime_sync.py \
+  --source <code-record-file> \
+  --runtime <installed-runtime-file>
+```
+
+脚本退出码 `0` 表示两份文件字节一致，`1` 表示内容不一致，`2` 表示文件无法读取。只有一致时才能把安装环境的结果归因于代码记录仓 patch；若构建或安装过程理应产生不同文件，改用聚焦 diff 证明逻辑等价，并在报告中解释差异，不能伪造 hash 一致。
