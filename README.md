@@ -205,9 +205,11 @@ torch/version.py
 ```
 
 运行测试前会记录编译仓、代码记录仓、安装验证仓，以及 `sys.executable`、
-`torch.__version__` 和 `torch.__file__`。需要编译时，修改从代码记录仓同步到编译仓；
-安装验证仓路径从 `torch.__file__` 动态解析，不假设 site-packages 布局。安装验证仓
-中验证有效的 runtime 修改可以保留用于后续复测，但不能进入代码记录仓源码 commit。
+`torch.__version__` 和 `torch.__file__`。全部源码/test 修改和 pytest test 都来自代码记录仓；
+pytest 实际加载安装验证仓中的 `torch`。无需编译的 Python runtime 修改直接从代码记录仓
+同步到安装验证仓；只有必须编译的源码才同步到编译仓，而且没有用户明确要求时不执行
+PyTorch 源码编译。安装验证仓路径从 `torch.__file__` 动态解析，不假设 site-packages 布局，
+其中验证有效的 runtime 修改可以保留用于后续复测，但不能进入代码记录仓源码 commit。
 完整规则见
 [`portable_setup.md`](optest-case-triage/references/portable_setup.md)。
 

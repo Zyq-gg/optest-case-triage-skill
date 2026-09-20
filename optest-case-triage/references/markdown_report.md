@@ -46,9 +46,9 @@
 
 | 仓库角色 | 路径 | 用途 | branch/HEAD 或版本 | dirty/验证状态 | 是否可提交 |
 | --- | --- | --- | --- | --- | --- |
-| 编译仓 | `<compile-repo>` | 构建源码、生成 build 产物、运行依赖编译结果的测试 | `<branch>/<HEAD>` | `<状态>` | `否；除非与代码记录仓相同` |
-| 代码记录仓 | `<code-record-repo>` | 保存 case 修改、生成 Git diff、commit 和 push | `<branch>/<HEAD>` | `<状态>` | `是，唯一提交来源` |
-| 安装验证仓 | `<Path(torch.__file__).resolve().parent>` | pytest 实际导入的 runtime 验证 | `<torch version>` | `<validation-only 状态>` | `否；允许保留有效验证修改` |
+| 编译仓 | `<compile-repo>` | 仅同步必须编译的源码；构建需用户明确要求 | `<branch>/<HEAD>` | `<未使用/源码镜像/build 状态>` | `否` |
+| 代码记录仓 | `<code-record-repo>` | 保存全部源码/test 修改并提供 pytest test，生成 Git diff、commit 和 push | `<branch>/<HEAD>` | `<状态>` | `是，唯一提交来源` |
+| 安装验证仓 | `<Path(torch.__file__).resolve().parent>` | pytest 实际导入的 runtime；承接 Python runtime 或授权构建产物 | `<torch version>` | `<validation-only 状态>` | `否；允许保留有效验证修改` |
 
 ### 2. 当前仓库状态
 
@@ -77,7 +77,7 @@
 
 只有确实影响多个 case 时才增加简短全局说明，例如：
 
-- 编译仓构建策略和安装验证仓验证策略；
+- 代码记录仓 test 来源、安装验证仓 runtime 来源，以及编译仓是否因必须编译的修改而使用；
 - 使用的官方诊断路线；
 - 工作簿错误日志的限制；
 - 共享 runner 或环境 warning；
@@ -141,7 +141,7 @@
 
 - 代码记录仓中修改的准确源码文件；
 - 每个已应用逻辑修改的聚焦 unified diff（必须从代码记录仓的 `git diff`、`git diff --cached` 或 `git show` 生成）；
-- 若为编译验证，编译仓同步了哪些文件、基线是什么、运行了什么构建命令；
+- 若修改必须编译，编译仓同步了哪些源码和基线；只有用户明确要求构建时才记录实际构建命令，否则明确写 `未授权编译，未完成 runtime 验证`；
 - changed field、branch、condition、metadata 或 assertion 如何解决根因；
 - 方案为何保留原测试目的；
 - 受影响和不受影响的 platform/dtype/shape/test；
@@ -159,7 +159,7 @@
 - 精确 case 结果与简洁 pytest summary；
 - 相邻/参数化/共享逻辑的 regression 覆盖；
 - `py_compile`、`git diff --check` 等静态检查；
-- 测试源码来自哪个仓库、编译产物来自哪个编译仓、实际 runtime 来自哪个安装验证仓；
+- 测试源码必须来自哪个代码记录仓、实际 runtime 来自哪个安装验证仓；经明确授权构建时再记录编译产物来自哪个编译仓；
 - 编译命令、安装/同步命令及其结果（如有）；
 - 候选路径敏感问题的强制/观测目标 candidate、非法适用域、base/fallback 和自然选择证据；
 - 性能敏感正确性修复的同环境 base/优化对照、首次编译开销和单候选资源淘汰信息；
@@ -243,9 +243,9 @@ cd <pytest 工作目录>
 
 | 仓库角色 | 路径 | 用途 | branch/HEAD 或版本 | dirty/验证状态 | 是否可提交 |
 | --- | --- | --- | --- | --- | --- |
-| 编译仓 | `<compile-repo>` | 构建和运行测试 | `<branch>/<HEAD>` | `<状态>` | `否；除非与代码记录仓相同` |
-| 代码记录仓 | `<code-record-repo>` | 保存 diff、commit 和 push | `<branch>/<HEAD>` | `<状态>` | `是，唯一提交来源` |
-| 安装验证仓 | `<torch.__file__ 所在目录>` | 实际导入 runtime 验证 | `<torch version>` | `<validation-only 状态>` | `否；允许保留有效验证修改` |
+| 编译仓 | `<compile-repo>` | 仅同步必须编译的源码；构建需用户明确要求 | `<branch>/<HEAD>` | `<状态>` | `否` |
+| 代码记录仓 | `<code-record-repo>` | 保存全部 diff、提供 test、commit 和 push | `<branch>/<HEAD>` | `<状态>` | `是，唯一提交来源` |
+| 安装验证仓 | `<torch.__file__ 所在目录>` | pytest 实际导入 runtime 验证 | `<torch version>` | `<validation-only 状态>` | `否；允许保留有效验证修改` |
 
 当前仓库状态：
 
@@ -259,7 +259,7 @@ remotes: <已映射 fork/internal/official 角色>
 代码提交状态: <无待提交修改 / 计划修改 / 已应用未提交 / 已提交 / 已推送；目标分支>
 ```
 
-<编译命令、编译产物来源、安装/同步命令，以及可保留的 validation-only 修改说明，如有>
+<测试源码来自代码记录仓、runtime 来自安装验证仓；如有，记录 Python 文件同步，或经用户明确要求执行的编译命令/产物，以及可保留的 validation-only 修改>
 
 | 顺序 | 工作簿行 | Case/根因 | 源码文件或 hunk | 状态 |
 | --- | --- | --- | --- | --- |

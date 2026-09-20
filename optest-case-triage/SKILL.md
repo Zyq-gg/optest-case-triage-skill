@@ -54,6 +54,7 @@ description: "用于分析 PyTorch optest/pytest case 或实际使用中遇到�
 
 - `<skill-dir>` 表示本 `SKILL.md` 所在目录；脚本、依赖声明和参考文档都从该目录解析。
 - 使用用户指定的问题现场/用户项目、编译仓、代码记录仓、Python 环境、工作簿和输出路径。需要 PyTorch 源码时明确区分编译仓、代码记录仓和安装验证仓；三者相同时仍分别记录角色。不涉及源码时允许编译仓和代码记录仓为 `未使用/不适用`。只有验证后才能采用当前目录或当前环境，不猜测固定主机路径和激活脚本。详细规则见 [references/portable_setup.md](references/portable_setup.md)。
+- 三仓默认数据流是：**代码记录仓提供全部源码修改和 test 代码，安装验证仓提供 pytest 实际加载的 `torch` runtime；编译仓只承接必须编译的源码镜像**。test-only 修改不得同步到编译仓；无需编译的 Python runtime 修改从代码记录仓同步到安装验证仓验证，也不得触碰编译仓。除非用户明确要求执行 PyTorch 源码编译，否则不得运行构建命令。
 - 将 `origin`、`upstream`、`official` 视为逻辑角色，按 URL 或用户说明映射；只 fetch 已配置 remote，缺少可选参考 remote 时继续完成可执行的本地分析。
 - fork 开发分支（例如 `2.9.1-dev-xxx`）通常对应内部基线 `2.9.1-dev`；除非用户另有指定。内部版本再映射到官方发布线（例如 `release/2.9`）判断覆盖情况。
 - 官方检索顺序是 `main`、较新的 release、目标 release。没有本地 official remote 时，使用本 skill 的官方技能指引和实时 GitHub 链接。
@@ -132,13 +133,15 @@ python3 <skill-dir>/scripts/find_case_in_xlsx.py \
 
 ### 2. 复现 case
 
-在编译仓中运行精确 pytest；如果编译仓和代码记录仓相同则直接在该 checkout 运行：
+使用**代码记录仓中的 test 文件**运行精确 pytest，同时确保 `torch` 从安装验证仓导入。不要从编译仓读取或同步测试文件。优先从代码记录仓的 `test/` 目录运行，避免仓库根目录的源码包遮蔽已安装 runtime：
 
 ```bash
 <用户提供的环境激活命令，如有>
-cd <compile-repo>
-python -m pytest -vs PY_NAME::CLASS_NAME::OP_NAME
+cd <code-record-repo>/test
+python -c 'from pathlib import Path; import pytest, torch; print(Path(torch.__file__).resolve().parent); raise SystemExit(pytest.main(["-vs", "<path-relative-to-test-dir>::CLASS_NAME::OP_NAME"]))'
 ```
+
+上面的 wrapper 在 pytest 改变 import path 前先导入并打印 `torch`，确保测试进程复用同一个安装 runtime。确认路径等于已记录的安装验证仓。若实际导入代码记录仓或编译仓中的 `torch`，先修正工作目录、`PYTHONPATH` 或 editable-install 影响；在 runtime 来源正确前，不得把结果当作权威复现或修复后验证。
 
 pytest 路径可能因工作目录带或不带 `test/` 前缀。在认定无法收集前先规范这两种形式：
 
@@ -155,9 +158,9 @@ pytest -vs PY_NAME -k OP_NAME
 
 记录通过/失败、简洁异常、耗时、生成代码路径、warning、编译/链接信息，以及当前错误是否与工作簿一致。
 
-复现时同时阅读代码记录仓或编译仓中的测试函数和相关 helper，明确测试目的。后续不得通过切换 backend、dtype、skip 条件、预期文本或断言，使测试虽然通过却不再测试原语义。
+复现时阅读代码记录仓中的测试函数和相关 helper，明确测试目的。后续不得通过切换 backend、dtype、skip 条件、预期文本或断言，使测试虽然通过却不再测试原语义。
 
-如果测试文件只在代码记录仓被修改，而测试需要编译产物才能看到修改，先把同一 patch 同步到编译仓并重新构建；如果只需要 Python 测试文件变化，则可直接从相应 checkout 运行，但报告必须写明测试源码来源。安装验证仓中验证有效的 runtime 修改默认保留，不自动回退，以便用户后续复测；它仍然不能进入代码记录仓 commit。
+test-only 修改始终只落在代码记录仓，并直接使用该仓 test 文件验证，不得为验证 test 修改而改动编译仓。无需编译的 Python runtime 修改也只在代码记录仓记录，再将同一文件同步到安装验证仓供 pytest 加载。只有 C/C++、生成绑定或其他必须重新编译才生效的源码修改，才允许把相同 patch 临时同步到编译仓；即便如此，没有用户明确要求也不得执行 PyTorch 源码构建。安装验证仓中验证有效的 runtime 修改默认保留，不自动回退，以便用户后续复测；它仍然不能进入代码记录仓 commit。
 
 若用户提供环境激活命令，使用该命令。否则保留当前环境，并记录 `sys.executable`、`torch.__version__`、`torch.__file__`。
 
@@ -267,13 +270,19 @@ git -C <code-record-repo> diff COMMIT^..COMMIT -- PY_NAME
 
 只修改解决当前问题所需代码，并保留用户和已有本地变更。参考优先级：精确官方修复、相关官方方向、较新内部 upstream、目标分支本地推理。
 
-所有 case 修改先记录在代码记录仓。测试文件可在代码记录仓修改；需要编译才能生效的 runtime 修改，再将相同 patch 临时同步到编译仓并构建。修改 runtime 前，先确认测试环境实际导入的安装验证仓：
+所有 case 的代码修改都先且必须记录在代码记录仓，包括 test 文件、Python runtime 和需要编译的源码。修改 runtime 前，先确认测试环境实际导入的安装验证仓：
 
 ```bash
 python -c "from pathlib import Path; import sys, torch; print(sys.executable); print(Path(torch.__file__).resolve().parent)"
 ```
 
-优先采用编译仓支持的源码/构建流程。必要时按“代码记录仓 → 编译仓 → 安装验证仓”同步同一最小 runtime patch；每一步都记录基线和命令。文档中的待提交内容只记录代码记录仓源码树，编译仓 build 产物/临时镜像和安装验证仓副本分别标为验证用途且绝不 stage。
+按文件类型选择唯一允许的验证流：
+
+- test-only：代码记录仓修改并从该仓运行 test；安装验证仓只提供原有 runtime；不修改编译仓。
+- 无需编译的 Python runtime：代码记录仓记录修改，再同步到安装验证仓；从代码记录仓运行 test；不修改编译仓。
+- 必须编译的源码：代码记录仓记录修改，再把相同源码 patch 临时同步到编译仓。只有用户明确要求源码编译时才构建，并把产物同步到安装验证仓验证；否则停在源码/static validation，明确记录“未编译、未做 runtime 验证”的 blocker。
+
+每一步都记录基线和命令。文档中的待提交内容只记录代码记录仓源码树，编译仓临时源码镜像/build 产物和安装验证仓副本分别标为验证用途且绝不 stage。
 
 推荐做法：
 
@@ -352,7 +361,7 @@ PASSED [108.4338s]
 6. 按领域路由并优先检索官方/版本历史，再自动选择配置、项目、安装、第三方、PyTorch、unsupported、workaround 或仅诊断方案；只有重大语义/权限取舍才让用户选择。
 7. 分层验证原始/等价复现的预期行为；PyTorch 源码修复再运行 regression 和相邻测试。候选路径敏感问题补充目标路径、非法适用域、fallback 和自然选择证据；性能目标补充同环境对照。错误消失但语义未验证不算完整修复。
 
-用户项目与 PyTorch 代码记录仓属于独立修改和提交边界。所有 PyTorch applied diff 来自代码记录仓；需要时同步到编译仓和安装验证仓。安装验证仓中验证有效的修改默认保留供用户复测，但不 stage/commit。
+用户项目与 PyTorch 代码记录仓属于独立修改和提交边界。所有 PyTorch applied diff 和 test 代码来自代码记录仓；无需编译的 Python runtime 只同步到安装验证仓，必须编译的源码才可同步到编译仓。除非用户明确要求，不执行 PyTorch 源码编译。安装验证仓中验证有效的修改默认保留供用户复测，但不 stage/commit。
 
 创建报告前完整阅读 [references/problem_report.md](references/problem_report.md)。一般问题报告不使用工作簿行号，固定包含：`问题现象与报错信息`、`预期行为与错误分析`、`解决方法`、`验证结果`、`提交建议`。默认写到用户指定路径、日志旁或当前任务目录的 `pytorch_problem_<short-name>.md`。
 
@@ -425,7 +434,7 @@ python3 <skill-dir>/scripts/backfill_triage_csv.py \
 
 ### 实际使用问题
 
-用户报告 `torch.compile` 模型 crash 时，先在问题现场保留原始模式复现，对照 eager/compiled 并路由 PT2；若根因是项目中不受支持的动态 Python 行为，优先调整用户项目或明确 graph break，不强行修改 PyTorch。若确认是 Inductor 缺陷，才在代码记录仓修复、按需同步编译仓和安装验证仓，并同时验证用户复现与 PyTorch regression test。涉及 autotune/template 优化时，强制目标 candidate 验证其正确性，用不满足适用域的输入验证 guard，检查普通 fallback 保留，再运行自然 autotune 和同环境性能对照；当前版本若仅因删除 candidate 而通过，应标为优化回退后的遏制状态。
+用户报告 `torch.compile` 模型 crash 时，先在问题现场保留原始模式复现，对照 eager/compiled 并路由 PT2；若根因是项目中不受支持的动态 Python 行为，优先调整用户项目或明确 graph break，不强行修改 PyTorch。若确认是 Inductor 缺陷，才在代码记录仓修复；Python runtime 修改直接同步安装验证仓，只有必须编译的源码才同步编译仓，且构建需要用户明确要求。随后使用代码记录仓 regression test 和安装验证仓 runtime 验证。涉及 autotune/template 优化时，强制目标 candidate 验证其正确性，用不满足适用域的输入验证 guard，检查普通 fallback 保留，再运行自然 autotune 和同环境性能对照；当前版本若仅因删除 candidate 而通过，应标为优化回退后的遏制状态。
 
 ### Timing 测试
 

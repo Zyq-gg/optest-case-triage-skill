@@ -47,9 +47,9 @@
 | 角色 | 路径/连接 | branch/HEAD 或版本 | 状态与用途 | 提交边界 |
 | --- | --- | --- | --- | --- |
 | 用户项目/问题现场 | `<path or connection>` | `<state>` | `<原始命令/日志/只读或已修改>` | `<独立仓库或不提交>` |
-| PyTorch 编译仓 | `<compile-repo>` | `<branch>/<HEAD>` | `<build/patch 状态>` | `build/验证副本不提交` |
-| PyTorch 代码记录仓 | `<code-record-repo>` | `<branch>/<HEAD>` | `<dirty/remote/base>` | `PyTorch 唯一提交来源` |
-| 安装验证仓 | `<torch.__file__ 所在目录>` | `<torch version>` | `<原始/已同步并保留的 validation-only patch>` | `不提交` |
+| PyTorch 编译仓 | `<compile-repo>` | `<branch>/<HEAD>` | `<未使用/必须编译源码镜像/经授权 build 状态>` | `源码镜像/build 验证副本不提交` |
+| PyTorch 代码记录仓 | `<code-record-repo>` | `<branch>/<HEAD>` | `<全部源码/test dirty/remote/base>` | `PyTorch 唯一提交来源和 test 来源` |
+| 安装验证仓 | `<torch.__file__ 所在目录>` | `<torch version>` | `<pytest runtime；原始/已同步并保留的 validation-only patch>` | `不提交` |
 
 同时记录：
 
@@ -121,7 +121,7 @@
 - 修改所属仓库和文件；
 - PyTorch applied diff 必须从代码记录仓 Git 生成；
 - 用户项目 diff 与 PyTorch diff 分开；
-- 编译仓同步文件、基线和构建命令；
+- 必须编译时记录编译仓同步文件和基线；只有用户明确要求构建时才记录构建命令，否则记录未编译 blocker；
 - 安装验证仓同步文件，以及是否保留供用户复测；
 - 修改前后行为和与根因的因果关系；
 - 影响和不影响的 device/dtype/shape/backend/API；
@@ -138,7 +138,7 @@
 - 原始或等价复现结果；
 - 可验证预期行为的 assertion/度量；
 - PyTorch regression test 和相邻覆盖；
-- 测试源码、编译产物和实际 runtime 来源；
+- 测试源码来自代码记录仓、实际 runtime 来自安装验证仓；经明确授权构建时再记录编译产物来源；
 - 静态检查；
 - 未运行范围、blocker 和残余风险；
 - 安装验证仓保留修改的路径和当前状态。

@@ -57,9 +57,9 @@
 | 角色 | 内容 | 修改和提交边界 |
 | --- | --- | --- |
 | 用户项目/问题现场 | 业务脚本、模型、配置、数据入口、第三方 extension 和原始命令 | 默认只读分析；若根因属于用户项目，只在用户要求修改时编辑。它有独立 Git/提交边界，不能混入 PyTorch 代码记录仓。 |
-| PyTorch 编译仓 | 构建 PyTorch 和运行依赖编译产物的测试 | 需要编译时同步代码记录仓 patch；build 产物不提交。 |
-| PyTorch 代码记录仓 | 保存 PyTorch 源码/test 修改 | PyTorch diff、commit 和 push 的唯一权威来源。 |
-| 安装验证仓 | `torch.__file__` 所在 runtime | 可保留验证有效的修改供用户复测，但不提交。 |
+| PyTorch 编译仓 | 只承接必须编译的源码镜像 | 仅此类修改可同步代码记录仓 patch；没有用户明确要求不得构建，build 产物不提交。 |
+| PyTorch 代码记录仓 | 保存全部 PyTorch 源码/test 修改并提供 pytest test | PyTorch diff、commit 和 push 的唯一权威来源。 |
+| 安装验证仓 | `torch.__file__` 所在 runtime | pytest 必须从这里加载 torch；可保留验证有效的 Python runtime 或授权构建产物，但不提交。 |
 
 问题明显是配置、用户代码或第三方组件时，不强制要求存在 PyTorch 编译仓和代码记录仓；在报告中写 `未使用/不适用`。只有需要检查或修改 PyTorch 源码时才进入三仓库源码流程。
 
@@ -216,12 +216,14 @@ git -C <code-record-repo> diff <candidate>^..<candidate> -- <target-files>
 PyTorch 源码修改遵守：
 
 ```text
-代码记录仓：记录权威 patch 和提交边界
-    ↓ 同一逻辑 patch
-编译仓：需要时构建和生成产物
-    ↓ 同一逻辑 patch
-安装验证仓：实际 runtime 验证，验证有效后保留供复测
+代码记录仓：记录所有 patch，并提供 pytest test
+    ├─ test-only：直接运行；安装验证仓提供原 runtime
+    ├─ Python runtime：直接同步安装验证仓
+    └─ 必须编译的源码：同步编译仓；仅在用户明确要求后构建并同步产物
+安装验证仓：pytest 实际加载的 runtime，验证有效后保留供复测
 ```
+
+编译仓不接收 test 文件或无需编译的 Python 文件。pytest 不从编译仓运行，也不得导入代码记录仓源码包代替安装验证仓。
 
 用户项目修改与 PyTorch 修改属于不同仓库和不同 commit。未经明确要求不提交或推送任一仓库。
 
