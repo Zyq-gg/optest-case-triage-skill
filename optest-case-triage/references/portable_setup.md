@@ -67,9 +67,9 @@ test -f torch/version.py
 
 | 角色 | 定义 | 允许的修改和用途 | 提交边界 |
 | --- | --- | --- | --- |
-| 编译仓 | 只用于必须编译的 PyTorch C/C++、binding 或生成源码的临时镜像和构建产物，例如 `/workspace/pytorch-compile`。 | 默认保持不改。只有修改必须编译才能生效的文件时，才可同步代码记录仓中的相同源码 patch；test 文件和无需编译的 Python 文件禁止同步到这里。没有用户明确要求时不得执行 PyTorch 源码编译。 | 临时源码镜像、build 目录和生成文件不提交；若该路径同时被指定为代码记录仓，仍按逻辑角色隔离 test/runtime/build 边界。 |
+| 编译仓 | 只用于必须编译的 PyTorch C/C++、binding 或生成源码的临时镜像和既有构建产物，例如 `/workspace/pytorch-compile`。 | 默认保持不改。只有修改必须编译才能生效的文件时，才可同步代码记录仓中的相同源码 patch，并仅作记录和源码/static validation；test 文件和无需编译的 Python 文件禁止同步到这里。本 skill 不执行任何 PyTorch 源码编译。 | 临时源码镜像、既有 build 目录和生成文件不提交；若该路径同时被指定为代码记录仓，仍按逻辑角色隔离 test/runtime/build 边界。 |
 | 代码记录仓 | 用于读取 test、保存所有 PyTorch 代码修改、创建 commit 和 push 的 checkout，例如 `/workspace/pytorch-code`。 | 所有 case 的源码和 test 修改都必须在此记录；pytest 使用这里的 test 代码；这里是提交建议、Git 状态、commit hash 和 MR/PR 边界的唯一权威来源。 | 只有该仓库中的目标 patch 才能进入 stage、commit 和 push；不得把编译仓或安装验证仓的镜像改动直接当作提交内容。 |
-| 安装验证仓 | 由实际运行的 `torch.__file__` 动态解析出的已安装 torch 包目录，可能位于 `/usr`、virtualenv 或其他 site-packages。 | pytest 必须加载这里的 runtime。无需编译的 Python runtime 修改从代码记录仓同步到这里验证；经明确授权构建的二进制产物也在这里验证。test 文件不放入这里。 | 永远只作 validation-only；不得 stage、commit、push，也不得把其路径误写成代码记录仓源码路径。 |
+| 安装验证仓 | 由实际运行的 `torch.__file__` 动态解析出的已安装 torch 包目录，可能位于 `/usr`、virtualenv 或其他 site-packages。 | pytest 必须加载这里的 runtime。无需编译的 Python runtime 修改从代码记录仓同步到这里验证；本 skill 不生成或同步新的 PyTorch 二进制产物。test 文件不放入这里。 | 永远只作 validation-only；不得 stage、commit、push，也不得把其路径误写成代码记录仓源码路径。 |
 
 默认角色映射：
 
@@ -88,7 +88,7 @@ test -f torch/version.py
 1. 代码记录仓中的 patch 是逻辑和提交的源头；每个 applied diff 都从该仓库的 Git 生成。
 2. pytest 的 test 源码始终来自代码记录仓；test-only patch 不同步到编译仓或安装验证仓。
 3. 无需编译的 Python runtime patch 从代码记录仓直接同步到安装验证仓；不得为此修改编译仓。
-4. 只有必须重新编译才能生效的源码 patch 才同步到编译仓。同步源码不代表授权构建；只有用户明确要求执行 PyTorch 源码编译时才运行构建命令，并将所得 runtime 产物同步到安装验证仓。
+4. 只有必须重新编译才能生效的源码 patch 才同步到编译仓，并且只作记录和源码/static validation。本 skill 不运行 `ninja`、`cmake --build`、`setup.py` 或等价的 PyTorch 源码构建命令，也不把既有 build 产物误写为当前 patch 的验证结果。
 5. pytest 必须加载安装验证仓中的 `torch`。编译仓或安装验证仓中的验证副本与代码记录仓不一致时，不能宣称“修复后通过”；应标为“验证副本不一致”，先同步或说明差异。
 
 按修改类型使用以下决策表，不得混用：
@@ -97,7 +97,7 @@ test -f torch/version.py
 | --- | --- | --- | --- | --- |
 | test-only | 修改并作为 pytest test 来源 | 不改 | runtime 保持原状 | 从代码记录仓运行 test，确认导入安装验证仓 |
 | 无需编译的 Python runtime | 修改并保存 diff | 不改 | 同步同一 Python 文件 | 从代码记录仓运行 test，确认导入安装验证仓 |
-| 必须编译的源码 | 修改并保存 diff | 同步相同源码 patch | 仅在用户明确要求构建后同步产物 | 未授权构建时只做源码/static validation，并记录未编译 blocker |
+| 必须编译的源码 | 修改并保存 diff | 同步相同源码 patch，仅作记录/static validation | 不生成或同步新产物 | 明确记录按规则未编译、新二进制 runtime 验证未完成及残余风险 |
 
 确认编译仓和代码记录仓：
 
@@ -186,7 +186,7 @@ git -C <repo> branch -vv
 python -c "from pathlib import Path; import torch; print(Path(torch.__file__).resolve().parent)"
 ```
 
-无需编译的 Python runtime 文件按“代码记录仓 → 安装验证仓”同步，编译仓保持不动。必须编译的源码按“代码记录仓 → 编译仓”同步；只有用户明确要求源码编译时，才执行构建并把产物同步到安装验证仓。没有明确构建要求时，不得自行用 `ninja`、`cmake --build`、`setup.py` 或等价命令编译 PyTorch，应在报告中准确写出尚未完成 runtime 验证。
+无需编译的 Python runtime 文件按“代码记录仓 → 安装验证仓”同步，编译仓保持不动。必须编译的源码按“代码记录仓 → 编译仓”同步后仅作记录和源码/static validation。本 skill 不运行 `ninja`、`cmake --build`、`setup.py` 或等价命令编译 PyTorch，也不生成或同步新的二进制产物。报告应写明这是既定验证边界，并准确记录尚未覆盖的新二进制 runtime 行为；不要把既有安装仓或 build 产物的结果归因于未编译 patch。
 
 分别记录每个验证副本的文件、基线和命令。安装验证仓中经验证有效的修改默认不回退，保留给用户后续复测；如果用户要求清理或切换版本，必须先记录当前副本状态再操作。绝不 stage 或 commit 编译仓临时 patch/build 产物、安装验证仓或工作仓库之外的文件。不得硬编码安装前缀、Python 版本或包管理器布局。
 
